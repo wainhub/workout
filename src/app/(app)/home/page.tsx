@@ -12,7 +12,7 @@ function formatDate() {
 function getNextDay(program: ReturnType<typeof useActiveProgram>, weekByDay: Record<number, number>) {
   // Return the day with the lowest week number (next to train)
   return program.days.reduce((prev, cur) =>
-    weekByDay[cur.id] <= weekByDay[prev.id] ? cur : prev
+    weekByDay[cur.id] < weekByDay[prev.id] ? cur : prev
   );
 }
 
