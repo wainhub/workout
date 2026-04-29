@@ -1,6 +1,6 @@
 'use client';
-import { use, useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { use, useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 
 function fmt(s: number) {
@@ -9,9 +9,10 @@ function fmt(s: number) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export default function RestPage({ params }: { params: Promise<{ dayId: string }> }) {
+function RestPageInner({ params }: { params: Promise<{ dayId: string }> }) {
   const { dayId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { state, dispatch } = useStore();
   const program = useActiveProgram();
   const session = state.activeSession;
@@ -52,7 +53,10 @@ export default function RestPage({ params }: { params: Promise<{ dayId: string }
 
   const currentExIdx = session.exIdx;
   const currentSets = session.sessionLog[currentExIdx] ?? [];
-  const allSetsDone = currentSets.every(s => s.status === 'done');
+  // Use URL param set by active page — avoids React 18 batching race where
+  // state hasn't committed by the time this page mounts.
+  const finParam = searchParams.get('fin');
+  const allSetsDone = finParam !== null ? finParam === '1' : currentSets.every(s => s.status === 'done');
   const doneSetsCount = currentSets.filter(s => s.status === 'done').length;
   const currentEx = day.exercises[currentExIdx];
   const nextEx = allSetsDone ? day.exercises[currentExIdx + 1] : null;
@@ -160,5 +164,13 @@ export default function RestPage({ params }: { params: Promise<{ dayId: string }
         </button>
       )}
     </div>
+  );
+}
+
+export default function RestPage({ params }: { params: Promise<{ dayId: string }> }) {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100svh', background: '#000' }} />}>
+      <RestPageInner params={params} />
+    </Suspense>
   );
 }

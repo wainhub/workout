@@ -50,11 +50,11 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         router.push(`/workout/${dayId}/summary`);
       } else {
         dispatch({ type: 'START_REST', target: restTarget });
-        router.push(`/workout/${dayId}/rest`);
+        router.push(`/workout/${dayId}/rest?fin=1`);
       }
     } else {
       dispatch({ type: 'START_REST', target: restTarget });
-      router.push(`/workout/${dayId}/rest`);
+      router.push(`/workout/${dayId}/rest?fin=0`);
     }
   }
 
