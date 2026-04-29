@@ -208,7 +208,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         <>
           <button style={s.doneBtn} onClick={completeSet}>Set complete ✓</button>
           <button
-            style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '12px 0', width: '100%' }}
+            style={{ width: '100%', height: 48, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 27, fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', marginTop: 8 }}
             onClick={skipSet}
           >
             Skip set
