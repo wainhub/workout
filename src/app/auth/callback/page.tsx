@@ -8,15 +8,23 @@ import type { Session } from '@supabase/supabase-js';
 export default function AuthCallbackPage() {
   const router = useRouter();
   const { dispatch } = useStore();
-  const [debug, setDebug] = useState('Loading…');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Show debug info immediately
+    // Check for error in URL hash (e.g. expired link)
     const hash = window.location.hash;
-    const search = window.location.search;
-    setDebug(`hash: ${hash.slice(0, 80) || '(none)'} | search: ${search.slice(0, 80) || '(none)'}`);
+    const hashParams = new URLSearchParams(hash.slice(1));
+    const errorCode = hashParams.get('error_code');
+    if (errorCode) {
+      if (errorCode === 'otp_expired') {
+        setError('This link has expired. Please request a new one.');
+      } else {
+        setError(`Sign-in failed: ${hashParams.get('error_description')?.replace(/\+/g, ' ') ?? errorCode}`);
+      }
+      return;
+    }
 
     async function handleSession(session: Session) {
       const u = session.user;
@@ -57,42 +65,28 @@ export default function AuthCallbackPage() {
     }
 
     // Path A: PKCE flow — ?code= in URL
-    const code = new URLSearchParams(search).get('code');
+    const code = new URLSearchParams(window.location.search).get('code');
     if (code) {
-      setDebug(`PKCE code found, exchanging…`);
       supabase.auth.exchangeCodeForSession(code).then(({ data: { session }, error }) => {
-        if (session) {
-          setDebug(`PKCE exchange OK — routing…`);
-          handleSession(session);
-        } else {
-          setDebug(`PKCE exchange FAILED: ${error?.message}`);
-          setTimeout(() => router.replace('/onboarding/signin'), 3000);
-        }
+        if (session) handleSession(session);
+        else setError(error?.message ?? 'Sign-in failed. Please try again.');
       });
       return;
     }
 
     // Path B: onAuthStateChange — implicit flow hash tokens
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setDebug(prev => prev + ` | event: ${event}`);
-      if (event === 'SIGNED_IN' && session) {
-        setDebug(`SIGNED_IN — routing…`);
-        handleSession(session);
-      }
+      if (event === 'SIGNED_IN' && session) handleSession(session);
     });
 
     // Path C: Session already exists
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setDebug(prev => prev + ` | getSession: ${session ? 'HAS SESSION' : 'null'}`);
-      if (session) {
-        handleSession(session);
-      }
+      if (session) handleSession(session);
     });
 
     // Fallback timeout
     const timeout = setTimeout(() => {
-      setDebug(prev => prev + ' | TIMEOUT — no session found');
-      // Don't auto-redirect — show debug info instead
+      router.replace('/onboarding/signin');
     }, 5000);
 
     return () => {
@@ -101,10 +95,25 @@ export default function AuthCallbackPage() {
     };
   }, [dispatch, router]);
 
+  if (error) {
+    return (
+      <div style={{ minHeight: '100svh', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ fontSize: 32, marginBottom: 16 }}>⚠️</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 8, textAlign: 'center' }}>Link expired</div>
+        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 32, textAlign: 'center', maxWidth: 300 }}>{error}</div>
+        <button
+          onClick={() => router.replace('/onboarding/signin')}
+          style={{ padding: '14px 28px', background: '#a1f0c2', color: '#062b18', border: 'none', borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Send a new link
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100svh', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Signing in…</div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', wordBreak: 'break-all', maxWidth: 500, textAlign: 'center', lineHeight: 1.6 }}>{debug}</div>
+    <div style={{ minHeight: '100svh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Signing in…</div>
     </div>
   );
 }
