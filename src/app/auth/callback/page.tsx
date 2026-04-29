@@ -11,11 +11,9 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) {
-        router.replace('/onboarding/signin');
-        return;
-      }
+    // Listen for auth state change — fires once the token in the URL is exchanged
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== 'SIGNED_IN' || !session?.user) return;
 
       const u = session.user;
       const rawProvider = u.app_metadata?.provider ?? 'email';
@@ -53,6 +51,8 @@ export default function AuthCallbackPage() {
       dispatch({ type: 'SIGN_IN', user: { provider, email, name } });
       router.replace('/onboarding/profile');
     });
+
+    return () => subscription.unsubscribe();
   }, [dispatch, router]);
 
   return (
