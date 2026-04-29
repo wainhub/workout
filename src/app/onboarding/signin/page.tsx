@@ -1,22 +1,31 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
 
 export default function SignInPage() {
-  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async function signIn(provider: 'apple' | 'google') {
+  async function sendMagicLink() {
+    if (!email.trim()) return;
+    setLoading(true);
+    setError('');
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    setLoading(false);
     if (error) {
-      console.error('OAuth error:', error.message);
+      setError(error.message);
+    } else {
+      setSent(true);
     }
   }
 
@@ -34,16 +43,23 @@ export default function SignInPage() {
     title: { fontSize: 28, fontWeight: 700, letterSpacing: '-0.025em', marginTop: 28 },
     sub: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.5, maxWidth: 280 },
     spacer: { flex: 1 },
-    appleBtn: {
-      width: '100%', height: 54, background: '#fff', color: '#000',
-      border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    input: {
+      width: '100%', height: 54, background: 'rgba(255,255,255,0.07)',
+      border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12,
+      fontSize: 16, color: '#fff', paddingLeft: 16, paddingRight: 16,
+      outline: 'none', boxSizing: 'border-box' as const,
     },
-    googleBtn: {
-      width: '100%', height: 54, background: '#fff', color: '#000',
-      border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 500, cursor: 'pointer',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10,
+    btn: {
+      width: '100%', height: 54, background: '#a1f0c2', color: '#062b18',
+      border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 700,
+      cursor: 'pointer', marginTop: 10,
     },
+    sentBox: {
+      width: '100%', padding: '20px 16px', background: 'rgba(161,240,194,0.08)',
+      border: '1px solid rgba(161,240,194,0.2)', borderRadius: 14,
+      textAlign: 'center' as const,
+    },
+    error: { fontSize: 13, color: '#ff6b6b', marginTop: 8 },
     fine: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 18, lineHeight: 1.5, maxWidth: 280 },
   };
 
@@ -51,16 +67,41 @@ export default function SignInPage() {
     <div style={s.screen}>
       <div style={s.logo}>✦</div>
       <div style={s.title}>Sign in to continue</div>
-      <div style={s.sub}>We use it to sync your programs across devices and back up your history.</div>
+      <div style={s.sub}>Enter your email and we'll send you a magic link — no password needed.</div>
       <div style={s.spacer} />
-      <button style={s.appleBtn} onClick={() => signIn('apple')}>
-        <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 700 }}></span>
-        Sign in with Apple
-      </button>
-      <button style={s.googleBtn} onClick={() => signIn('google')}>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>G</span>
-        Sign in with Google
-      </button>
+
+      {sent ? (
+        <div style={s.sentBox}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Check your email</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+            We sent a magic link to <strong>{email}</strong>. Tap it to sign in.
+          </div>
+          <button
+            style={{ ...s.btn, background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)', marginTop: 16, fontSize: 13 }}
+            onClick={() => setSent(false)}
+          >
+            Use a different email
+          </button>
+        </div>
+      ) : (
+        <>
+          <input
+            style={s.input}
+            type="email"
+            placeholder="your@email.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendMagicLink()}
+            autoComplete="email"
+          />
+          {error && <div style={s.error}>{error}</div>}
+          <button style={s.btn} onClick={sendMagicLink} disabled={loading}>
+            {loading ? 'Sending…' : 'Send magic link →'}
+          </button>
+        </>
+      )}
+
       <div style={s.fine}>By continuing you agree to our Terms of Service and Privacy Policy.</div>
     </div>
   );
