@@ -14,18 +14,25 @@ export default function SignInPage() {
     if (!email.trim()) return;
     setLoading(true);
     setError('');
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
-      setSent(true);
+    try {
+      const supabase = createClient();
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out — check your connection')), 8000)
+      );
+      const request = supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      const { error } = await Promise.race([request, timeout]) as Awaited<typeof request>;
+      if (error) {
+        setError(error.message);
+      } else {
+        setSent(true);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
     }
   }
 
