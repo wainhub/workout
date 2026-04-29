@@ -171,7 +171,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
               onClick={e => e.stopPropagation()}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', textDecoration: 'none' }}
             >
-              ▶ Form
+              ▶ Sample Videos
             </a>
           </div>
         </div>
