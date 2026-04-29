@@ -35,15 +35,10 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     dispatch({ type: 'UPDATE_SETS', exIdx: session!.exIdx, sets: next });
   }
 
-  function completeSet() {
-    const next = sets.map((s, i) => {
-      if (i === activeIdx) return { ...s, status: 'done' as const, actualWeight: s.weight, actualReps: s.reps };
-      if (i === activeIdx + 1) return { ...s, status: 'active' as const };
-      return s;
-    });
+  function advanceAfterSet(next: SetEntry[]) {
     dispatch({ type: 'UPDATE_SETS', exIdx: session!.exIdx, sets: next });
     const restTarget = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
-    const justFinishedAll = next.every(s => s.status === 'done');
+    const justFinishedAll = next.every(s => s.status === 'done' || s.status === 'skipped');
     if (justFinishedAll) {
       if (isLast) {
         dispatch({ type: 'START_REST', target: 0 });
@@ -56,6 +51,24 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       dispatch({ type: 'START_REST', target: restTarget });
       router.push(`/workout/${dayId}/rest?fin=0`);
     }
+  }
+
+  function completeSet() {
+    const next = sets.map((s, i) => {
+      if (i === activeIdx) return { ...s, status: 'done' as const, actualWeight: s.weight, actualReps: s.reps };
+      if (i === activeIdx + 1) return { ...s, status: 'active' as const };
+      return s;
+    });
+    advanceAfterSet(next);
+  }
+
+  function skipSet() {
+    const next = sets.map((s, i) => {
+      if (i === activeIdx) return { ...s, status: 'skipped' as const };
+      if (i === activeIdx + 1 && s.status === 'upcoming') return { ...s, status: 'active' as const };
+      return s;
+    });
+    advanceAfterSet(next);
   }
 
   function nextExercise() {
@@ -85,7 +98,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   function setRowStyle(status: string) {
     return {
       display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-      background: status === 'done' ? 'rgba(161,240,194,0.07)' : status === 'active' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+      background: status === 'done' ? 'rgba(161,240,194,0.07)' : status === 'skipped' ? 'rgba(255,255,255,0.02)' : status === 'active' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
       borderRadius: 11, marginBottom: 4,
       border: status === 'active' ? '1px solid rgba(161,240,194,0.35)' : '1px solid transparent',
     };
@@ -171,6 +184,8 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           <div style={{ fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', flex: 1 }}>
             {set.status === 'done'
               ? <span style={{ color: '#a1f0c2' }}>{set.actualWeight === 0 ? 'BW' : set.actualWeight} × {set.actualReps} reps</span>
+              : set.status === 'skipped'
+              ? <span style={{ color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }}>Skipped · {set.weight === 0 ? 'BW' : `${set.weight} lb`} × {set.reps}</span>
               : set.status === 'active'
               ? <span>● working — {set.weight === 0 ? 'BW' : `${set.weight} lb`} × {set.reps} reps</span>
               : <span style={{ color: 'rgba(255,255,255,0.45)' }}>Upcoming · {set.weight === 0 ? 'BW' : `${set.weight} lb`} × {set.reps}</span>
@@ -190,7 +205,15 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           </button>
         )
       ) : (
-        <button style={s.doneBtn} onClick={completeSet}>Set complete</button>
+        <>
+          <button style={s.doneBtn} onClick={completeSet}>Set complete ✓</button>
+          <button
+            style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '12px 0', width: '100%' }}
+            onClick={skipSet}
+          >
+            Skip set
+          </button>
+        </>
       )}
     </div>
   );
