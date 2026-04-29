@@ -15,6 +15,7 @@ export default function SignInPage() {
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function signInWithGoogle() {
@@ -24,15 +25,28 @@ export default function SignInPage() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) { setError(error.message); setGoogleLoading(false); }
-      // On success, browser redirects to Google — no need to setLoading(false)
     } catch {
       setError('Something went wrong. Try again.');
       setGoogleLoading(false);
+    }
+  }
+
+  async function signInWithApple() {
+    setAppleLoading(true);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) { setError(error.message); setAppleLoading(false); }
+    } catch {
+      setError('Something went wrong. Try again.');
+      setAppleLoading(false);
     }
   }
 
@@ -126,6 +140,13 @@ export default function SignInPage() {
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
       opacity: googleLoading ? 0.7 : 1,
     },
+    appleBtn: {
+      width: '100%', height: 54, background: '#000', color: '#fff',
+      border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, fontSize: 15, fontWeight: 600,
+      cursor: appleLoading ? 'default' : 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+      opacity: appleLoading ? 0.7 : 1, marginTop: 10,
+    },
     divider: {
       display: 'flex', alignItems: 'center', gap: 12, width: '100%', margin: '18px 0',
     },
@@ -177,6 +198,14 @@ export default function SignInPage() {
 
       {!showEmail ? (
         <>
+          {/* Apple sign-in */}
+          <button style={s.appleBtn} onClick={signInWithApple} disabled={appleLoading}>
+            <svg width="18" height="20" viewBox="0 0 814 1000" fill="#fff">
+              <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.5-155.5-127.4C46.7 790.7 0 663 0 541.8c0-207.1 134.3-316.7 266.1-316.7 103.9 0 174.6 55.1 220.2 55.1 43.5 0 124.4-60.4 211.4-60.4zm-127.4-161.2c26.1-31.3 44.6-74.7 44.6-118.1 0-6.1-.5-12.2-1.6-17.2-42.3 1.6-92.4 28.3-122.8 62.9-21.8 24.4-43.8 67.7-43.8 111.8 0 6.7 1.1 13.4 1.6 15.5 2.7.6 7.2 1.6 11.8 1.6 37.9 0 86.2-25.4 110.2-56.5z"/>
+            </svg>
+            {appleLoading ? 'Redirecting…' : 'Continue with Apple'}
+          </button>
+
           {/* Google sign-in */}
           <button style={s.googleBtn} onClick={signInWithGoogle} disabled={googleLoading}>
             <svg width="20" height="20" viewBox="0 0 48 48">
