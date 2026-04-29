@@ -129,7 +129,7 @@ export default function MePage() {
       {confirmSignOut ? (
         <div style={s.confirmCard}>
           <div style={s.confirmText}>
-            Sign out? Your data stays on this device — sign back in any time to continue.
+            Sign out? Your data is saved to the cloud — sign back in any time to pick up where you left off.
           </div>
           <div style={s.confirmRow}>
             <button style={s.cancelBtn} onClick={() => setConfirmSignOut(false)}>Cancel</button>
