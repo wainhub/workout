@@ -11,6 +11,8 @@ export default function MePage() {
   const { state, dispatch } = useStore();
   const [mounted, setMounted] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div style={{ minHeight: '100svh', background: '#000' }} />;
 
@@ -19,6 +21,22 @@ export default function MePage() {
   const totalSessions = state.history.length;
   const totalVolume = state.history.reduce((n, s) => n + s.totalVolume, 0);
   const totalSets = state.history.reduce((n, s) => n + s.totalSets, 0);
+
+  async function submitFeedback() {
+    if (!feedbackText.trim()) return;
+    setFeedbackState('sending');
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ message: feedbackText.trim() }),
+      });
+      if (res.ok) { setFeedbackState('sent'); setFeedbackText(''); }
+      else setFeedbackState('error');
+    } catch { setFeedbackState('error'); }
+  }
 
   async function signOut() {
     if (state.user?.email) {
@@ -109,6 +127,35 @@ export default function MePage() {
       <div style={s.row}>
         <div style={s.rowLabel}>Sessions logged</div>
         <div style={s.rowValue}>{totalSessions}</div>
+      </div>
+
+      <div style={s.section}>Feedback</div>
+      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14, marginBottom: 16 }}>
+        {feedbackState === 'sent' ? (
+          <div style={{ textAlign: 'center', padding: '12px 0' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>🙏</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Thanks for the feedback!</div>
+            <button onClick={() => setFeedbackState('idle')} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer' }}>Send more</button>
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={feedbackText}
+              onChange={e => { setFeedbackText(e.target.value); setFeedbackState('idle'); }}
+              placeholder="Bug report, feature idea, or anything on your mind…"
+              rows={3}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#fff', fontSize: 14, padding: 12, resize: 'none', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }}
+            />
+            {feedbackState === 'error' && <div style={{ fontSize: 12, color: '#ff6b6b', marginTop: 6 }}>Failed to send — try again.</div>}
+            <button
+              onClick={submitFeedback}
+              disabled={feedbackState === 'sending' || !feedbackText.trim()}
+              style={{ marginTop: 10, width: '100%', height: 42, background: feedbackText.trim() ? 'rgba(161,240,194,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${feedbackText.trim() ? 'rgba(161,240,194,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, color: feedbackText.trim() ? '#a1f0c2' : 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 600, cursor: feedbackText.trim() ? 'pointer' : 'default' }}
+            >
+              {feedbackState === 'sending' ? 'Sending…' : 'Send feedback'}
+            </button>
+          </>
+        )}
       </div>
 
       <div style={s.section}>Account</div>

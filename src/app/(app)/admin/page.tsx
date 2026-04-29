@@ -14,6 +14,13 @@ interface SupabaseUser {
   last_sign_in_at?: string;
 }
 
+interface FeedbackItem {
+  id: string;
+  email: string;
+  message: string;
+  created_at: string;
+}
+
 function fmtDate(iso: string | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('en-US', {
@@ -43,11 +50,14 @@ function isToday(iso: string): boolean {
 export default function AdminPage() {
   const { state } = useStore();
   const user = state.user;
+  const [tab, setTab] = useState<'users' | 'feedback'>('users');
   const [users, setUsers] = useState<SupabaseUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   async function getToken() {
     const supabase = createClient();
@@ -90,9 +100,31 @@ export default function AdminPage() {
     }
   }
 
+  async function fetchFeedback() {
+    setFeedbackLoading(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/feedback', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const d = await res.json(); setFeedback(d.feedback ?? []); }
+    } finally { setFeedbackLoading(false); }
+  }
+
+  async function deleteFeedback(id: string) {
+    const token = await getToken();
+    if (!token) return;
+    await fetch('/api/admin/feedback', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    setFeedback(prev => prev.filter(f => f.id !== id));
+  }
+
   useEffect(() => {
     if (user?.email !== ADMIN_EMAIL) return;
     fetchUsers();
+    fetchFeedback();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email]);
 
@@ -104,6 +136,8 @@ export default function AdminPage() {
     card: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 12px', textAlign: 'center' as const },
     cardLabel: { fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)', marginBottom: 6 },
     cardVal: { fontSize: 26, fontWeight: 800, color: GREEN },
+    tabRow: { display: 'flex', gap: 8, marginBottom: 20 },
+    tabBtn: (active: boolean) => ({ padding: '8px 18px', borderRadius: 999, border: 'none', background: active ? GREEN : 'rgba(255,255,255,0.08)', color: active ? '#062b18' : 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }),
     sectionLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' as const, marginBottom: 10 },
     tableCard: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' },
     row: { display: 'flex', flexDirection: 'column' as const, padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' },
@@ -131,7 +165,33 @@ export default function AdminPage() {
       <div style={s.title}>Admin</div>
       <div style={s.subtitle}>User overview</div>
 
-      {loading ? (
+      <div style={s.tabRow}>
+        <button style={s.tabBtn(tab === 'users')} onClick={() => setTab('users')}>Users</button>
+        <button style={s.tabBtn(tab === 'feedback')} onClick={() => setTab('feedback')}>
+          Feedback {feedback.length > 0 ? `(${feedback.length})` : ''}
+        </button>
+      </div>
+
+      {tab === 'feedback' ? (
+        feedbackLoading ? <div style={s.loadingBox}>Loading…</div> : feedback.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14, padding: '40px 0' }}>No feedback yet.</div>
+        ) : (
+          <div style={s.tableCard}>
+            {feedback.map((f, i) => (
+              <div key={f.id} style={{ padding: '14px 16px', borderBottom: i === feedback.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: GREEN }}>{f.email}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{fmtDate(f.created_at)}</div>
+                  </div>
+                  <button onClick={() => deleteFeedback(f.id)} style={{ background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '4px 9px', color: '#ff6b6b', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Delete</button>
+                </div>
+                <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(255,255,255,0.85)', whiteSpace: 'pre-wrap' }}>{f.message}</div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : loading ? (
         <div style={s.loadingBox}>Loading...</div>
       ) : error ? (
         <div style={s.errorBox}>{error}</div>
