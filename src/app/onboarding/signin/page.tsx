@@ -1,37 +1,86 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { useStore } from '@/lib/store';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
 
 export default function SignInPage() {
+  const router = useRouter();
+  const { dispatch } = useStore();
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function sendMagicLink() {
+  async function sendCode() {
     if (!email.trim()) return;
     setLoading(true);
     setError('');
     try {
       const supabase = createClient();
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out — check your connection')), 8000)
-      );
-      const request = supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { shouldCreateUser: true },
       });
-      const { error } = await Promise.race([request, timeout]) as Awaited<typeof request>;
-      if (error) {
-        setError(error.message);
-      } else {
-        setSent(true);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      if (error) setError(error.message);
+      else setStep('code');
+    } catch {
+      setError('Something went wrong. Try again.');
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyCode() {
+    if (!code.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { data: { session }, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: code.trim(),
+        type: 'email',
+      });
+      if (error || !session) {
+        setError(error?.message ?? 'Invalid code. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Signed in — restore state or onboard
+      const u = session.user;
+      const emailVal = u.email ?? '';
+      const name = u.user_metadata?.full_name ?? u.user_metadata?.name ?? emailVal.split('@')[0] ?? 'User';
+      const user = { provider: 'email' as const, email: emailVal, name };
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase.from('user_state') as any)
+          .select('state').eq('user_id', u.id).single();
+        if (data?.state) {
+          dispatch({ type: 'RESTORE_STATE', savedState: { ...data.state, user } });
+          router.replace('/home');
+          return;
+        }
+      } catch {}
+
+      const saved = localStorage.getItem(`wain-workout-user-${emailVal}`);
+      if (saved) {
+        try {
+          dispatch({ type: 'RESTORE_STATE', savedState: { ...JSON.parse(saved), user } });
+          router.replace('/home');
+          return;
+        } catch {}
+      }
+
+      dispatch({ type: 'SIGN_IN', user });
+      router.replace('/onboarding/profile');
+    } catch {
+      setError('Something went wrong. Try again.');
       setLoading(false);
     }
   }
@@ -56,42 +105,37 @@ export default function SignInPage() {
       fontSize: 16, color: '#fff', paddingLeft: 16, paddingRight: 16,
       outline: 'none', boxSizing: 'border-box' as const,
     },
+    codeInput: {
+      width: '100%', height: 64, background: 'rgba(255,255,255,0.07)',
+      border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12,
+      fontSize: 32, fontWeight: 700, color: '#fff', textAlign: 'center' as const,
+      letterSpacing: '0.25em', outline: 'none', boxSizing: 'border-box' as const,
+    },
     btn: {
       width: '100%', height: 54, background: '#a1f0c2', color: '#062b18',
       border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 700,
       cursor: 'pointer', marginTop: 10,
     },
-    sentBox: {
-      width: '100%', padding: '20px 16px', background: 'rgba(161,240,194,0.08)',
-      border: '1px solid rgba(161,240,194,0.2)', borderRadius: 14,
-      textAlign: 'center' as const,
-    },
     error: { fontSize: 13, color: '#ff6b6b', marginTop: 8 },
     fine: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 18, lineHeight: 1.5, maxWidth: 280 },
+    backBtn: {
+      background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)',
+      fontSize: 13, cursor: 'pointer', marginTop: 16, padding: '8px 0',
+    },
   };
 
   return (
     <div style={s.screen}>
       <div style={s.logo}>✦</div>
       <div style={s.title}>Sign in to continue</div>
-      <div style={s.sub}>Enter your email and we'll send you a magic link — no password needed.</div>
+      <div style={s.sub}>
+        {step === 'email'
+          ? "Enter your email and we'll send you a 6-digit code."
+          : `Enter the code we sent to ${email}`}
+      </div>
       <div style={s.spacer} />
 
-      {sent ? (
-        <div style={s.sentBox}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📬</div>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Check your email</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
-            We sent a magic link to <strong>{email}</strong>. Tap it to sign in.
-          </div>
-          <button
-            style={{ ...s.btn, background: 'transparent', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)', marginTop: 16, fontSize: 13 }}
-            onClick={() => setSent(false)}
-          >
-            Use a different email
-          </button>
-        </div>
-      ) : (
+      {step === 'email' ? (
         <>
           <input
             style={s.input}
@@ -99,12 +143,34 @@ export default function SignInPage() {
             placeholder="your@email.com"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMagicLink()}
+            onKeyDown={e => e.key === 'Enter' && sendCode()}
             autoComplete="email"
           />
           {error && <div style={s.error}>{error}</div>}
-          <button style={s.btn} onClick={sendMagicLink} disabled={loading}>
-            {loading ? 'Sending…' : 'Send magic link →'}
+          <button style={s.btn} onClick={sendCode} disabled={loading}>
+            {loading ? 'Sending…' : 'Send code →'}
+          </button>
+        </>
+      ) : (
+        <>
+          <input
+            style={s.codeInput}
+            type="text"
+            inputMode="numeric"
+            placeholder="000000"
+            maxLength={8}
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={e => e.key === 'Enter' && verifyCode()}
+            autoFocus
+            autoComplete="one-time-code"
+          />
+          {error && <div style={s.error}>{error}</div>}
+          <button style={s.btn} onClick={verifyCode} disabled={loading}>
+            {loading ? 'Verifying…' : 'Sign in →'}
+          </button>
+          <button style={s.backBtn} onClick={() => { setStep('email'); setCode(''); setError(''); }}>
+            ← Use a different email
           </button>
         </>
       )}
