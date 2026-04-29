@@ -25,8 +25,10 @@ export async function GET(req: NextRequest) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
+  console.log('[admin] serviceRoleKey present:', !!serviceRoleKey, '| supabaseUrl present:', !!supabaseUrl);
+
   if (!serviceRoleKey || !supabaseUrl) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    return NextResponse.json({ error: `Server configuration error: serviceRoleKey=${!!serviceRoleKey}, supabaseUrl=${!!supabaseUrl}` }, { status: 500 });
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {

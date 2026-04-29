@@ -77,9 +77,9 @@ export default function MePage() {
         <div>
           <div style={s.userName}>{user?.name ?? 'User'}</div>
           <div style={s.userEmail}>{user?.email ?? ''}</div>
-          {user?.provider && (
+          {user?.provider && user.provider !== 'email' && (
             <div style={s.providerBadge}>
-              {user.provider === 'apple' ? ' Apple' : 'G Google'}
+              {user.provider === 'apple' ? '🍎 Apple' : 'G Google'}
             </div>
           )}
         </div>
