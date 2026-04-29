@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useStore } from '@/lib/store';
@@ -8,9 +8,15 @@ import type { Session } from '@supabase/supabase-js';
 export default function AuthCallbackPage() {
   const router = useRouter();
   const { dispatch } = useStore();
+  const [debug, setDebug] = useState('Loading…');
 
   useEffect(() => {
     const supabase = createClient();
+
+    // Show debug info immediately
+    const hash = window.location.hash;
+    const search = window.location.search;
+    setDebug(`hash: ${hash.slice(0, 80) || '(none)'} | search: ${search.slice(0, 80) || '(none)'}`);
 
     async function handleSession(session: Session) {
       const u = session.user;
@@ -50,35 +56,43 @@ export default function AuthCallbackPage() {
       router.replace('/onboarding/profile');
     }
 
-    // Path A: PKCE flow — Supabase puts a ?code= in the URL
-    const code = new URLSearchParams(window.location.search).get('code');
+    // Path A: PKCE flow — ?code= in URL
+    const code = new URLSearchParams(search).get('code');
     if (code) {
+      setDebug(`PKCE code found, exchanging…`);
       supabase.auth.exchangeCodeForSession(code).then(({ data: { session }, error }) => {
-        if (session) handleSession(session);
-        else {
-          console.error('PKCE exchange failed', error);
-          router.replace('/onboarding/signin');
+        if (session) {
+          setDebug(`PKCE exchange OK — routing…`);
+          handleSession(session);
+        } else {
+          setDebug(`PKCE exchange FAILED: ${error?.message}`);
+          setTimeout(() => router.replace('/onboarding/signin'), 3000);
         }
       });
       return;
     }
 
-    // Path B: Implicit flow — hash tokens handled automatically by Supabase client
-    // onAuthStateChange fires SIGNED_IN once the hash is processed
+    // Path B: onAuthStateChange — implicit flow hash tokens
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setDebug(prev => prev + ` | event: ${event}`);
       if (event === 'SIGNED_IN' && session) {
+        setDebug(`SIGNED_IN — routing…`);
         handleSession(session);
       }
     });
 
-    // Path C: Session already exists (e.g. page refresh, token already exchanged)
+    // Path C: Session already exists
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) handleSession(session);
+      setDebug(prev => prev + ` | getSession: ${session ? 'HAS SESSION' : 'null'}`);
+      if (session) {
+        handleSession(session);
+      }
     });
 
-    // Fallback timeout — if nothing fires after 5s, send to sign-in
+    // Fallback timeout
     const timeout = setTimeout(() => {
-      router.replace('/onboarding/signin');
+      setDebug(prev => prev + ' | TIMEOUT — no session found');
+      // Don't auto-redirect — show debug info instead
     }, 5000);
 
     return () => {
@@ -88,8 +102,9 @@ export default function AuthCallbackPage() {
   }, [dispatch, router]);
 
   return (
-    <div style={{ minHeight: '100svh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Signing in…</div>
+    <div style={{ minHeight: '100svh', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>Signing in…</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', wordBreak: 'break-all', maxWidth: 500, textAlign: 'center', lineHeight: 1.6 }}>{debug}</div>
     </div>
   );
 }
