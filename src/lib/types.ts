@@ -76,7 +76,7 @@ export interface Prefs {
 export interface User {
   name: string;
   email: string;
-  provider: 'apple' | 'google';
+  provider: 'apple' | 'google' | 'email';
 }
 
 export interface IntakeAnswers {

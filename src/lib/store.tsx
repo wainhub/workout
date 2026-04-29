@@ -3,6 +3,7 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import type { AppState, AppAction, SessionLog, CompletedSession } from './types';
 import { SEED_PROGRAMS, DEFAULT_WEEK_BY_DAY } from './data';
+import { createClient } from './supabase';
 
 const STORAGE_KEY = 'wain-workout-v1';
 
@@ -255,10 +256,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return init;
   });
 
+  // Persist to localStorage on every state change
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {}
+
+    // Sync to Supabase (debounced 2s) when user is logged in
+    if (!state.user) return;
+    const timer = setTimeout(async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from('user_state') as any).upsert({
+          user_id: session.user.id,
+          state,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [state]);
 
   return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>;
