@@ -4,42 +4,59 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_EMAIL = 'wain@kellum.net';
 
-export async function GET(req: NextRequest) {
-  // Verify the requesting user via the Bearer token
+async function getAdminClient(req: NextRequest) {
   const authHeader = req.headers.get('authorization') ?? '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return { error: 'Unauthorized', status: 403, adminClient: null };
 
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
-
-  // Verify the token with Supabase anon client
   const browserClient = createBrowserClient();
   const { data: { user }, error: userError } = await browserClient.auth.getUser(token);
-
   if (userError || !user || user.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return { error: 'Forbidden', status: 403, adminClient: null };
   }
 
-  // Use service role key to list all users
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  console.log('[admin] serviceRoleKey present:', !!serviceRoleKey, '| supabaseUrl present:', !!supabaseUrl);
-
   if (!serviceRoleKey || !supabaseUrl) {
-    return NextResponse.json({ error: `Server configuration error: serviceRoleKey=${!!serviceRoleKey}, supabaseUrl=${!!supabaseUrl}` }, { status: 500 });
+    return { error: 'Server configuration error', status: 500, adminClient: null };
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data, error } = await adminClient.auth.admin.listUsers();
+  return { error: null, status: 200, adminClient };
+}
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+export async function GET(req: NextRequest) {
+  const { error, status, adminClient } = await getAdminClient(req);
+  if (!adminClient) return NextResponse.json({ error }, { status });
+
+  const { data, error: listError } = await adminClient.auth.admin.listUsers();
+  if (listError) return NextResponse.json({ error: listError.message }, { status: 500 });
 
   return NextResponse.json({ users: data.users });
+}
+
+export async function DELETE(req: NextRequest) {
+  const { error, status, adminClient } = await getAdminClient(req);
+  if (!adminClient) return NextResponse.json({ error }, { status });
+
+  const { userId } = await req.json();
+  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+
+  // Delete user_state first (belt-and-suspenders; cascade should handle it)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const adminClient2 = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (adminClient2.from('user_state') as any).delete().eq('user_id', userId);
+
+  // Delete the auth user
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+  return NextResponse.json({ success: true });
 }

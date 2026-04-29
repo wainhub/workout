@@ -46,40 +46,54 @@ export default function AdminPage() {
   const [users, setUsers] = useState<SupabaseUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function getToken() {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }
+
+  async function fetchUsers() {
+    try {
+      const token = await getToken();
+      if (!token) { setError('No active session — please sign in again.'); setLoading(false); return; }
+      const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.error ?? `Request failed (${res.status})`); setLoading(false); return; }
+      const data = await res.json();
+      setUsers(data.users ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    setDeleting(true);
+    try {
+      const token = await getToken();
+      if (!token) { setError('No active session.'); return; }
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.error ?? 'Delete failed'); return; }
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      setConfirmDeleteId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     if (user?.email !== ADMIN_EMAIL) return;
-
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) {
-          setError('No active session — please sign in again.');
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch('/api/admin/users', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          setError(body.error ?? `Request failed (${res.status})`);
-          setLoading(false);
-          return;
-        }
-
-        const data = await res.json();
-        setUsers(data.users ?? []);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.email]);
 
   const s = {
@@ -146,18 +160,35 @@ export default function AdminPage() {
               </div>
             )}
             {users.map((u, i) => (
-              <div
-                key={u.id}
-                style={{
-                  ...s.row,
-                  ...(i === users.length - 1 ? { borderBottom: 'none' } : {}),
-                }}
-              >
-                <div style={s.rowEmail}>{u.email ?? '(no email)'}</div>
-                <div style={s.rowMeta}>
-                  Signed up {fmtDate(u.created_at)}
-                  {u.last_sign_in_at ? ` · Last seen ${fmtDate(u.last_sign_in_at)}` : ''}
+              <div key={u.id} style={{ borderBottom: i === users.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ ...s.row, borderBottom: 'none', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={s.rowEmail}>{u.email ?? '(no email)'}</div>
+                    <div style={s.rowMeta}>
+                      Signed up {fmtDate(u.created_at)}
+                      {u.last_sign_in_at ? ` · Last seen ${fmtDate(u.last_sign_in_at)}` : ''}
+                    </div>
+                  </div>
+                  {u.email !== ADMIN_EMAIL && (
+                    <button
+                      onClick={() => setConfirmDeleteId(confirmDeleteId === u.id ? null : u.id)}
+                      style={{ background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8, padding: '5px 10px', color: '#ff6b6b', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
+                {confirmDeleteId === u.id && (
+                  <div style={{ padding: '10px 14px', background: 'rgba(255,80,80,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Delete {u.email} and all their data?</div>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button onClick={() => setConfirmDeleteId(null)} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 6, padding: '5px 10px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={() => deleteUser(u.id)} disabled={deleting} style={{ background: 'rgba(255,80,80,0.3)', border: '1px solid rgba(255,80,80,0.4)', borderRadius: 6, padding: '5px 10px', color: '#ff6b6b', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        {deleting ? '…' : 'Confirm'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
