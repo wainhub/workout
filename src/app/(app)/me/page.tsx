@@ -113,6 +113,19 @@ export default function MePage() {
 
       <div style={s.section}>Account</div>
 
+      {user?.email === 'wain@kellum.net' && (
+        <div
+          style={{ ...s.row, cursor: 'pointer' }}
+          onClick={() => router.push('/admin')}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>🛡</span>
+            <div style={s.rowLabel}>Admin Panel</div>
+          </div>
+          <div style={s.rowValue}>›</div>
+        </div>
+      )}
+
       {confirmSignOut ? (
         <div style={s.confirmCard}>
           <div style={s.confirmText}>
