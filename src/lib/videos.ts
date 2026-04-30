@@ -55,6 +55,49 @@ export const EXERCISE_VIDEOS: Record<string, string> = {
   'DB Concentration Curl':        'VMbDQ8PZazY',
   'Superman Hold':                'z6PJMT2y8GQ',
 
+  // Flexibility — Upper Mobility
+  'Cat-Cow':                          'kqnua4rHVVA',
+  'Doorway Chest Stretch':            'Or6HXq-fEU8',
+  'Thoracic Rotation':                'lIYElbFO4HE',
+  'Cross-Body Shoulder Stretch':      'YeHDqVFOyXM',
+  'Overhead Tricep Stretch':          'Xpn7fUk-u7E',
+  'Neck Lateral Stretch':             'dg7c5vSwLZ8',
+  // Flexibility — Lower Mobility
+  'Hip Flexor Stretch':               'YQmpDMCr-mA',
+  'Pigeon Pose':                      '_drMbSgWMfQ',
+  'Standing Hamstring Stretch':       'pPVEMFE6n3A',
+  'Butterfly Stretch':                'k5xNFtIqhmE',
+  'Couch Stretch':                    'zjFNxpIqT0I',
+  'Calf Stretch':                     'eUQCITLjB5k',
+  // Flexibility — Full Body Flow
+  "World's Greatest Stretch":         'RIMqHMD3FDM',
+  'Inchworm':                         '5V4sFqoBJhI',
+  'Hip Circle':                       'KSxzRpVaGpY',
+  'Thread the Needle':                'P5KHFqjqKQ4',
+  '90/90 Hip Stretch':                'iH_9oAdD6EI',
+  "Child's Pose":                     'eqVMAPM00Qs',
+  // Flexibility — Restore
+  'Lying Spinal Twist':               'M8sRBED26EM',
+  'Supine Hamstring Stretch':         'zxX2u0xb0UE',
+  'Puppy Pose':                       'NG9qbvAN3gQ',
+  'Figure-4 Stretch':                 'iN-FPh7r3zU',
+  'Diaphragmatic Breathing':          'FBcb6f3bM5s',
+  // Cardio — HIIT
+  'Jumping Jack Warm-Up':             'c4DAnQ6DtF8',
+  'Burpee':                           'auBLPXO8Fww',
+  'Mountain Climber':                 'nmwgirgXLYM',
+  'Jump Squat':                       'CVaEhXotL7M',
+  'High Knees':                       'ZZZoCNMU48U',
+  'Plank Hold Finisher':              'B296mZDhrP4',
+  // Cardio — Steady State
+  'Jump Rope':                        'u3zgHI8QnqE',
+  'Bear Crawl':                       '0OuNMjbvLXg',
+  'Incline Walk':                     'RlgNikGr0U0',
+  // Cardio — Circuit / Endurance
+  'Squat Jump':                       'CVaEhXotL7M',
+  'Lateral Shuffle':                  'tOrdSBjIqjA',
+  'Skater Jump':                      'L5bWMmSIbXs',
+
   // Lower B — Posterior Chain
   'DB Bulgarian Split Squat':     'hiLF_pF3EJM',
   'DB Stiff-Leg Deadlift':        'KE2A7G_nDc8',

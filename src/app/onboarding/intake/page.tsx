@@ -24,6 +24,8 @@ const FLOW = [
     { label: 'Get stronger', value: 'strength' },
     { label: 'Lose fat', value: 'fat_loss' },
     { label: 'General fitness', value: 'general' },
+    { label: 'Improve flexibility', value: 'flexibility' },
+    { label: 'Build cardio / endurance', value: 'cardio' },
   ]},
   { id: 'experience', bot: "How long have you been training consistently?", chips: [
     { label: 'New to lifting', value: 'beginner' },
@@ -40,11 +42,12 @@ const FLOW = [
     { label: 'Garage gym (barbell + rack)', value: 'garage' },
     { label: 'Bodyweight only', value: 'bw' },
   ]},
-  { id: 'emphasis', bot: "Anything to emphasize? Pick one or skip.", chips: [
-    { label: 'Chest', value: 'chest' }, { label: 'Back', value: 'back' }, { label: 'Arms', value: 'arms' },
-    { label: 'Legs', value: 'legs' }, { label: 'Shoulders', value: 'shoulders' }, { label: 'No preference', value: 'none' },
+  { id: 'emphasis', bot: "Any area to focus on? Pick one or skip.", chips: [
+    { label: 'Upper body', value: 'upper' }, { label: 'Lower body', value: 'lower' },
+    { label: 'Core', value: 'core' }, { label: 'Arms', value: 'arms' },
+    { label: 'Hips & glutes', value: 'hips' }, { label: 'No preference', value: 'none' },
   ]},
-  { id: 'injuries', bot: "Any injuries or movements to avoid?", chips: [
+  { id: 'injuries', bot: "Any injuries or areas to avoid?", chips: [
     { label: 'None', value: 'none' }, { label: 'Lower back', value: 'lower_back' },
     { label: 'Knees', value: 'knees' }, { label: 'Shoulders', value: 'shoulder_inj' },
   ]},

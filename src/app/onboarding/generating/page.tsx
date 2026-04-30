@@ -20,15 +20,21 @@ const PHASES = [
 /** Rule-based fallback — used when the API fails or times out */
 function buildFallbackProgram(answers: IntakeAnswers): Program {
   const goalLabel: Record<string, string> = {
-    hypertrophy: 'Build Muscle', strength: 'Get Stronger',
-    fat_loss: 'Fat Loss', general: 'General Fitness',
+    hypertrophy:  'Build Muscle',
+    strength:     'Get Stronger',
+    fat_loss:     'Fat Loss',
+    general:      'General Fitness',
+    flexibility:  'Flexibility & Mobility',
+    cardio:       'Cardio & Endurance',
   };
   const goal = answers.goal ?? 'general';
   const equipment = answers.equipment ?? 'full_gym';
   const name = goalLabel[goal] ?? 'General Fitness';
-  const daysCount = Math.min(Number(answers.days ?? 4), 4);
+  // Flexibility/cardio don't need a day cap — use as-is (up to 4 fallback days)
+  const isStrength = !['flexibility', 'cardio'].includes(goal);
+  const daysCount = isStrength ? Math.min(Number(answers.days ?? 4), 4) : Math.min(Number(answers.days ?? 4), 4);
 
-  const allDays = getDays(equipment);
+  const allDays = getDays(equipment, goal);
   const programDays = allDays.slice(0, daysCount).map(day => ({
     ...day,
     exercises: day.exercises.map(ex => ({

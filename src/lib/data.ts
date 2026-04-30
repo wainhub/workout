@@ -144,7 +144,101 @@ const BODYWEIGHT_DAYS = [
   },
 ];
 
-function getDays(equipment: string) {
+// Flexibility — mat + bodyweight, holds in seconds
+const FLEXIBILITY_DAYS = [
+  {
+    id: 1, name: 'Upper Mobility', focus: 'Chest · Shoulders · Thoracic Spine · Neck',
+    exercises: [
+      { name: 'Cat-Cow',                      sets: 3, reps: 10, weight: 0, unit: 'BW',     type: 'Compound' as const, cue: 'Exhale to arch (cat), inhale to dip (cow). Slow and rhythmic.' },
+      { name: 'Doorway Chest Stretch',        sets: 3, reps: 30, weight: 0, unit: 'sec',    type: 'Isolation' as const, cue: 'Forearms on door frame, gentle lean forward. Feel the stretch across chest.' },
+      { name: 'Thoracic Rotation',            sets: 3, reps: 10, weight: 0, unit: 'ea. BW', type: 'Compound' as const, cue: 'Hands behind head, rotate open as far as possible — don\'t let hips move.' },
+      { name: 'Cross-Body Shoulder Stretch',  sets: 3, reps: 30, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Pull arm across chest, keep shoulder packed down.' },
+      { name: 'Overhead Tricep Stretch',      sets: 3, reps: 30, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Elbow bent behind head, gently pull with opposite hand.' },
+      { name: 'Neck Lateral Stretch',         sets: 3, reps: 30, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Ear toward shoulder, don\'t shrug. Breathe.' },
+    ],
+  },
+  {
+    id: 2, name: 'Lower Mobility', focus: 'Hips · Hamstrings · Quads · Calves',
+    exercises: [
+      { name: 'Hip Flexor Stretch',   sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Low lunge, back knee down, drive hips forward. Keep torso tall.' },
+      { name: 'Pigeon Pose',          sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Front shin parallel (or near), fold forward to deepen. Breathe into the hip.' },
+      { name: 'Standing Hamstring Stretch', sets: 3, reps: 30, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Straight leg on a surface, hinge at hip — not the lower back.' },
+      { name: 'Butterfly Stretch',    sets: 3, reps: 45, weight: 0, unit: 'sec',    type: 'Isolation' as const, cue: 'Feet together, elbows push knees down gently. Hinge forward from hips.' },
+      { name: 'Couch Stretch',        sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Back foot on couch/wall, front foot forward. Feel quad and hip flexor stretch.' },
+      { name: 'Calf Stretch',         sets: 3, reps: 30, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Hands on wall, back heel down. Straight leg for gastrocnemius, bent for soleus.' },
+    ],
+  },
+  {
+    id: 3, name: 'Full Body Flow', focus: 'Dynamic Mobility · Full Range of Motion',
+    exercises: [
+      { name: 'World\'s Greatest Stretch', sets: 3, reps: 6,  weight: 0, unit: 'ea. BW', type: 'Compound' as const, cue: 'Lunge + rotate + reach. One fluid movement per rep, slow and controlled.' },
+      { name: 'Inchworm',                  sets: 3, reps: 8,  weight: 0, unit: 'BW',     type: 'Compound' as const, cue: 'Walk hands out to plank, hold 1 sec, walk feet in. Keep legs straight.' },
+      { name: 'Hip Circle',                sets: 3, reps: 10, weight: 0, unit: 'ea. BW', type: 'Compound' as const, cue: 'Standing, draw large circles with your knee. Full range each direction.' },
+      { name: 'Thread the Needle',         sets: 3, reps: 10, weight: 0, unit: 'ea. BW', type: 'Isolation' as const, cue: 'On all fours, thread one arm under body and rotate open. Feel thoracic spine rotate.' },
+      { name: '90/90 Hip Stretch',         sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'Both legs at 90°, front shin and rear shin. Sit tall, lean gently forward.' },
+      { name: 'Child\'s Pose',             sets: 3, reps: 30, weight: 0, unit: 'sec',    type: 'Isolation' as const, cue: 'Arms overhead, breathe into your back. Let gravity do the work.' },
+    ],
+  },
+  {
+    id: 4, name: 'Restore & Recover', focus: 'Gentle Holds · Breath Work · Deep Release',
+    exercises: [
+      { name: 'Lying Spinal Twist',         sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'On back, knee across body, look the other way. Zero effort — just breathe.' },
+      { name: 'Supine Hamstring Stretch',   sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'On back, pull leg toward chest with a strap or towel. Soft knee.' },
+      { name: 'Puppy Pose',                 sets: 3, reps: 45, weight: 0, unit: 'sec',    type: 'Isolation' as const, cue: 'Hips over knees, chest toward floor, arms forward. Great for lats and thoracic.' },
+      { name: 'Figure-4 Stretch',           sets: 3, reps: 45, weight: 0, unit: 'sec ea.', type: 'Isolation' as const, cue: 'On back, ankle on opposite knee, gently push knee away. Deep glute/piriformis.' },
+      { name: 'Diaphragmatic Breathing',    sets: 5, reps: 8,  weight: 0, unit: 'BW',     type: 'Isolation' as const, cue: 'Hand on belly, breathe into it. 4 sec in, hold 2, 6 sec out. Calms the nervous system.' },
+    ],
+  },
+];
+
+// Cardio — bodyweight + optional equipment, reps in seconds where noted
+const CARDIO_DAYS = [
+  {
+    id: 1, name: 'HIIT', focus: 'High Intensity Intervals · Max Output · Short Rest',
+    exercises: [
+      { name: 'Jumping Jack Warm-Up',  sets: 1, reps: 60, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Easy pace to raise heart rate. Don\'t skip this.' },
+      { name: 'Burpee',                sets: 5, reps: 30, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: '30 sec max effort, 30 sec rest between rounds. Full lockout at top.' },
+      { name: 'Mountain Climber',      sets: 4, reps: 30, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Hips level, fast feet. Drive knees toward chest alternately.' },
+      { name: 'Jump Squat',            sets: 4, reps: 30, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Squat to parallel, explode up, land soft. 30 on / 30 off.' },
+      { name: 'High Knees',            sets: 4, reps: 30, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Pump arms, drive knees to hip height. Fast cadence.' },
+      { name: 'Plank Hold Finisher',   sets: 3, reps: 30, weight: 0, unit: 'sec',    type: 'Isolation' as const, cue: 'Max effort plank. Core braced, breathe.' },
+    ],
+  },
+  {
+    id: 2, name: 'Steady State', focus: 'Aerobic Base · Zone 2 · Sustained Effort',
+    exercises: [
+      { name: 'Light Jog / Walk Warm-Up',  sets: 1, reps: 5,  weight: 0, unit: 'min',    type: 'Compound' as const, cue: 'Easy effort. Can hold a conversation.' },
+      { name: 'Moderate Pace Run / Bike',  sets: 1, reps: 20, weight: 0, unit: 'min',    type: 'Compound' as const, cue: 'Zone 2 — you can speak in full sentences but feel the effort. Consistent pace.' },
+      { name: 'Incline Walk',              sets: 3, reps: 5,  weight: 0, unit: 'min',    type: 'Compound' as const, cue: 'Treadmill 8–10% grade at 3–4 mph, or walk uphill outside. Hands off rails.' },
+      { name: 'Jump Rope',                 sets: 4, reps: 60, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Light bouncing, consistent tempo. If you trip, restart.' },
+      { name: 'Bear Crawl',                sets: 3, reps: 30, weight: 0, unit: 'sec',    type: 'Compound' as const, cue: 'Knees 2 inches off floor, opposite arm/leg. Slow and controlled.' },
+    ],
+  },
+  {
+    id: 3, name: 'Cardio Circuit', focus: 'Strength-Cardio Mix · Full Body · No Rest',
+    exercises: [
+      { name: 'Push-Up',            sets: 4, reps: 15, weight: 0, unit: 'BW',  type: 'Compound' as const, cue: 'Full range. Move straight to the next exercise — this is a circuit, no rest.' },
+      { name: 'Squat Jump',         sets: 4, reps: 15, weight: 0, unit: 'BW',  type: 'Compound' as const, cue: 'Explode up every rep. Land soft, absorb with the legs.' },
+      { name: 'Mountain Climber',   sets: 4, reps: 20, weight: 0, unit: 'BW',  type: 'Compound' as const, cue: 'Fast alternating knees. Keep hips level.' },
+      { name: 'Plank',              sets: 4, reps: 45, weight: 0, unit: 'sec', type: 'Isolation' as const, cue: 'Max tension — squeeze glutes and abs simultaneously.' },
+      { name: 'Burpee',             sets: 4, reps: 10, weight: 0, unit: 'BW',  type: 'Compound' as const, cue: 'Full extension at top. Each rep counts. Rest 90 sec after each round.' },
+    ],
+  },
+  {
+    id: 4, name: 'Endurance Intervals', focus: 'Longer Work Bouts · Aerobic Capacity · Tempo',
+    exercises: [
+      { name: 'Dynamic Warm-Up',       sets: 1, reps: 5,  weight: 0, unit: 'min',    type: 'Compound' as const, cue: 'Leg swings, arm circles, light jog. Get the joints moving.' },
+      { name: 'Tempo Run / Row / Bike', sets: 6, reps: 2,  weight: 0, unit: 'min',   type: 'Compound' as const, cue: '2 min hard (7/10 effort), 1 min easy recovery. Stay consistent across all 6 rounds.' },
+      { name: 'Lateral Shuffle',        sets: 4, reps: 30, weight: 0, unit: 'sec',   type: 'Compound' as const, cue: 'Stay low, quick feet side to side. Good for agility and glute medius.' },
+      { name: 'Skater Jump',            sets: 4, reps: 30, weight: 0, unit: 'sec',   type: 'Compound' as const, cue: 'Single-leg landing, push off laterally. Soft landing, hold briefly each side.' },
+      { name: 'Cool-Down Walk',         sets: 1, reps: 5,  weight: 0, unit: 'min',   type: 'Isolation' as const, cue: 'Drop the pace. Heart rate should come down to near-resting before you stop.' },
+    ],
+  },
+];
+
+function getDays(equipment: string, goal?: string) {
+  if (goal === 'flexibility') return FLEXIBILITY_DAYS;
+  if (goal === 'cardio') return CARDIO_DAYS;
   if (equipment === 'bw') return BODYWEIGHT_DAYS;
   if (equipment === 'home_db') return HOME_DB_DAYS;
   return FULL_GYM_DAYS; // full_gym, garage, or anything else
@@ -152,20 +246,24 @@ function getDays(equipment: string) {
 
 function buildReasoning(goal: string, equipment: string, days: number): string {
   const goalText: Record<string, string> = {
-    hypertrophy: `An upper/lower split hitting each muscle group twice per week is the gold standard for building muscle. At ${days} days/week you're in the optimal volume range — enough stimulus to drive growth, enough rest to recover.`,
-    strength:    `This program prioritizes progressive overload on compound movements. Lower rep ranges (6–8) and heavier loads build the neuromuscular efficiency and raw strength you're after. Add weight whenever you hit the top of the range.`,
-    fat_loss:    `Resistance training preserves muscle while in a calorie deficit — the only way to lose fat and still look athletic. This program's compound-heavy structure burns more calories and keeps your metabolism elevated long after the session ends.`,
-    general:     `A balanced push/pull structure that builds strength, improves body composition, and stays sustainable. At ${days} days/week you'll make consistent progress without burning out — the best program is one you actually do.`,
+    hypertrophy:  `An upper/lower split hitting each muscle group twice per week is the gold standard for building muscle. At ${days} days/week you're in the optimal volume range — enough stimulus to drive growth, enough rest to recover.`,
+    strength:     `This program prioritizes progressive overload on compound movements. Lower rep ranges (6–8) and heavier loads build the neuromuscular efficiency and raw strength you're after. Add weight whenever you hit the top of the range.`,
+    fat_loss:     `Resistance training preserves muscle while in a calorie deficit — the only way to lose fat and still look athletic. This program's compound-heavy structure burns more calories and keeps your metabolism elevated long after the session ends.`,
+    general:      `A balanced push/pull structure that builds strength, improves body composition, and stays sustainable. At ${days} days/week you'll make consistent progress without burning out — the best program is one you actually do.`,
+    flexibility:  `This program uses a mix of dynamic mobility work and longer static holds to systematically improve your range of motion. At ${days} days/week you'll see meaningful change in 4–6 weeks — consistency matters more than intensity here.`,
+    cardio:       `This program builds your aerobic engine through a mix of HIIT, steady-state, and circuit sessions. At ${days} days/week you'll improve VO2 max, burn fat efficiently, and build the kind of fitness that carries over to everything else.`,
   };
   const equipText: Record<string, string> = {
-    full_gym: `Full gym access gives you the best tool for each movement — cables for constant tension isolation, machines for stable loading, free weights for strength.`,
-    garage:   `Barbell and rack training is the most effective strength setup available. Heavy compounds are the backbone.`,
-    home_db:  `Every exercise uses only dumbbells and a bench — no cables, no machines. You can get 90% of gym results with this setup.`,
-    bw:       `Every exercise is bodyweight only — no equipment needed beyond a chair and ideally a pull-up bar. Progressive overload comes from reps, tempo, and harder variations.`,
+    full_gym:    `Full gym access gives you the best tool for each movement — cables for constant tension, machines for stable loading, free weights for strength.`,
+    garage:      `Barbell and rack training is the most effective strength setup available. Heavy compounds are the backbone.`,
+    home_db:     `Every exercise uses only dumbbells and a bench — no cables, no machines. You can get 90% of gym results with this setup.`,
+    bw:          `Every exercise is bodyweight only — no equipment needed beyond a chair and ideally a pull-up bar.`,
+    flexibility: '',
+    cardio:      '',
   };
   const gr = goalText[goal] ?? goalText.general;
-  const er = equipText[equipment] ?? equipText.full_gym;
-  return `${gr} ${er}`;
+  const er = (goal === 'flexibility' || goal === 'cardio') ? '' : (equipText[equipment] ?? equipText.full_gym);
+  return `${gr}${er ? ' ' + er : ''}`;
 }
 
 export { getDays, buildReasoning };
