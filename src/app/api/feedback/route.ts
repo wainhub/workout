@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'coach@kellum.net',
+        from: 'wain@kellum.net',
         to: 'wain@kellum.net',
         subject: '💬 New app feedback',
         html: `

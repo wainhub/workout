@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'coach@kellum.net',
+      from: 'wain@kellum.net',
       to: 'wain@kellum.net',
       subject: 'New user signed up 🎉',
       html: htmlBody,
