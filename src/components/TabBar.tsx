@@ -3,8 +3,8 @@ import { usePathname, useRouter } from 'next/navigation';
 
 const TABS = [
   { href: '/home',    label: 'Home',    icon: '⌂' },
-  { href: '/history', label: 'History', icon: '↻' },
   { href: '/library', label: 'Library', icon: '▤' },
+  { href: '/history', label: 'History', icon: '↻' },
   { href: '/me',      label: 'Me',      icon: '◎' },
 ];
 
