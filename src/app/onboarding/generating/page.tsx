@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { SEED_PROGRAMS } from '@/lib/data';
+import { getDays, buildReasoning } from '@/lib/data';
 import type { Program, IntakeAnswers } from '@/lib/types';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
@@ -18,25 +18,29 @@ const PHASES = [
 
 function buildProgram(answers: IntakeAnswers): Program {
   const goalLabel: Record<string, string> = {
-    hypertrophy: 'Hypertrophy', strength: 'Strength',
+    hypertrophy: 'Build Muscle', strength: 'Strength',
     fat_loss: 'Fat Loss', general: 'General Fitness',
   };
-  const name = goalLabel[answers.goal ?? 'hypertrophy'] ?? 'Hypertrophy';
-  const days = Number(answers.days ?? 4);
-  const base = SEED_PROGRAMS[0];
-  const programDays = base.days.slice(0, Math.min(days, 4));
-  const totalDays = programDays.length * 12;
+  const goal = answers.goal ?? 'general';
+  const equipment = answers.equipment ?? 'full_gym';
+  const name = goalLabel[goal] ?? 'General Fitness';
+  const daysCount = Math.min(Number(answers.days ?? 4), 4);
+
+  const allDays = getDays(equipment);
+  const programDays = allDays.slice(0, daysCount);
+  const reasoning = buildReasoning(goal, equipment, daysCount);
 
   return {
-    ...base,
     id: `p-${Date.now()}`,
     name,
     goal: name,
-    daysPerWeek: programDays.length,
+    weeks: 12,
+    daysPerWeek: daysCount,
     days: programDays,
     daysCompleted: 0,
-    totalDays,
+    totalDays: daysCount * 12,
     weeksCompleted: 0,
+    reasoning,
     createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
   };
 }
