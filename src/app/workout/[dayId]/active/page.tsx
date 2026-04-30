@@ -36,12 +36,22 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const [autoSetIdx, setAutoSetIdx] = useState(0);
   const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Adjustable work duration (seconds) — persisted back to the exercise on change
+  const [workDurAdj, setWorkDurAdj] = useState<number>(() => {
+    if (!session) return 30;
+    const d = program.days.find(p => p.id === session.dayId);
+    const e = d?.exercises[session.exIdx];
+    if (!e) return 30;
+    return e.unit?.includes('min') ? Number(e.reps) * 60 : Number(e.reps);
+  });
+  const workDurAdjRef = useRef(workDurAdj);
+
   // Refs to avoid stale closures inside timer callbacks
   const setsRef = useRef<SetEntry[]>([]);
   const isLastRef = useRef(false);
   const exIdxRef = useRef(0);
   const autoSetIdxRef = useRef(0);
-  const autoAfterRestRef = useRef<{ next: number; advance: boolean; restDur: number } | null>(null);
+  const autoAfterRestRef = useRef<{ next: number; advance: boolean; restDur: number; workDur: number } | null>(null);
   const mountedRef = useRef(true);
 
   // Reset everything when exercise changes, and auto-open first set editor
@@ -61,12 +71,16 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     if (restRef.current) clearInterval(restRef.current);
     if (autoRef.current) clearInterval(autoRef.current);
 
-    // Auto-open first pending set for non-HIIT exercises
+    // Auto-open first pending set for non-HIIT exercises; reset work duration
     if (!session) { setEditingSet(null); return; }
     const currentDay = program.days.find(d => d.id === session.dayId);
     const currentEx = currentDay?.exercises[session.exIdx];
     if (!currentEx) { setEditingSet(null); return; }
     const timeBased = !!(currentEx.unit?.includes('sec') || currentEx.unit?.includes('min'));
+    // Restore saved work duration for HIIT exercises
+    const savedDur = currentEx.unit?.includes('min') ? Number(currentEx.reps) * 60 : Number(currentEx.reps);
+    setWorkDurAdj(savedDur);
+    workDurAdjRef.current = savedDur;
     if (timeBased) { setEditingSet(null); return; }
     const currentSets: SetEntry[] = session.sessionLog[session.exIdx] ?? [];
     const firstPending = currentSets.findIndex(s => s.status !== 'done' && s.status !== 'skipped');
@@ -238,16 +252,30 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   }
 
   // ── HIIT auto-timer ───────────────────────────────────────────────
-  function startAutoTimer() {
-    setAutoStarted(true);
-    runAutoWork(0, exRestTarget);
+  function adjustWorkDur(delta: number) {
+    const next = Math.max(5, workDurAdjRef.current + delta);
+    workDurAdjRef.current = next;
+    setWorkDurAdj(next);
+    // Persist to store so next session starts with this value
+    dispatch({
+      type: 'UPDATE_EXERCISE',
+      programId: program.id,
+      dayId: session!.dayId,
+      exIdx: session!.exIdx,
+      exercise: { ...ex, reps: next, unit: 'sec' },
+    });
   }
 
-  function runAutoWork(setIdx: number, restDur: number) {
+  function startAutoTimer() {
+    setAutoStarted(true);
+    runAutoWork(0, exRestTarget, workDurAdjRef.current);
+  }
+
+  function runAutoWork(setIdx: number, restDur: number, workDur: number) {
     if (!mountedRef.current) return;
     if (autoRef.current) clearInterval(autoRef.current);
     setAutoPhase('work');
-    setAutoSecs(workDurSecs);
+    setAutoSecs(workDur);
     setAutoSetIdx(setIdx);
     autoSetIdxRef.current = setIdx;
 
@@ -261,13 +289,13 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
             const cur = setsRef.current;
             const updated = cur.map((s, i) =>
               i === idx
-                ? { ...s, status: 'done' as const, actualWeight: 0, actualReps: ex.reps }
+                ? { ...s, status: 'done' as const, actualWeight: 0, actualReps: workDur }
                 : (i === idx + 1 && s.status === 'upcoming' ? { ...s, status: 'active' as const } : s)
             );
             dispatch({ type: 'UPDATE_SETS', exIdx: exIdxRef.current, sets: updated });
             const nextSetIdx = idx + 1;
             const advance = nextSetIdx >= cur.length;
-            runAutoRest(advance ? -1 : nextSetIdx, restDur, advance);
+            runAutoRest(advance ? -1 : nextSetIdx, restDur, advance, workDur);
           }, 100);
           return 0;
         }
@@ -276,10 +304,10 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     }, 1000);
   }
 
-  function runAutoRest(nextSetIdx: number, restDur: number, advance: boolean) {
+  function runAutoRest(nextSetIdx: number, restDur: number, advance: boolean, workDur: number) {
     if (!mountedRef.current) return;
     if (autoRef.current) clearInterval(autoRef.current);
-    autoAfterRestRef.current = { next: nextSetIdx, advance, restDur };
+    autoAfterRestRef.current = { next: nextSetIdx, advance, restDur, workDur };
     setAutoPhase('rest');
     setAutoSecs(restDur);
 
@@ -308,7 +336,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         router.push(`/workout/${dayId}/active`);
       }
     } else {
-      runAutoWork(info.next, info.restDur);
+      runAutoWork(info.next, info.restDur, info.workDur);
     }
   }
 
@@ -341,7 +369,8 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     // Rest timer
     restBox: { marginTop: 12, padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14 },
     restRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-    adjBtn: { width: 32, height: 28, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+    adjBtn: { width: 44, height: 44, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontSize: 20, fontWeight: 700, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+    adjBtnSm: { width: 32, height: 28, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   };
 
   const totalEx = day.exercises.length;
@@ -427,8 +456,23 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           {!autoStarted ? (
             <>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center' as const, lineHeight: 1.6 }}>
-                {sets.length} sets · {fmtTime(workDurSecs)}s work · auto-advances between sets
+                {sets.length} sets · auto-advances between sets
               </div>
+
+              {/* Work duration adjuster */}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' as const }}>Work Duration</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <button style={s.adjBtn} onClick={() => adjustWorkDur(-5)}>−</button>
+                  <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', minWidth: 80, textAlign: 'center' as const, fontVariantNumeric: 'tabular-nums' as const }}>
+                    {fmtTime(workDurAdj)}
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginLeft: 4 }}>sec</span>
+                  </div>
+                  <button style={s.adjBtn} onClick={() => adjustWorkDur(+5)}>+</button>
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>saved for next session</div>
+              </div>
+
               <button style={s.hiitStartBtn} onClick={startAutoTimer}>▶ Start</button>
             </>
           ) : (
@@ -588,8 +632,8 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button style={s.adjBtn} onClick={() => adjustRest(-15)}>−</button>
-              <button style={s.adjBtn} onClick={() => adjustRest(+15)}>+</button>
+              <button style={s.adjBtnSm} onClick={() => adjustRest(-15)}>−</button>
+              <button style={s.adjBtnSm} onClick={() => adjustRest(+15)}>+</button>
               <button
                 onClick={skipRest}
                 style={{ padding: '4px 10px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
