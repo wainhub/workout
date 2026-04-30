@@ -155,15 +155,28 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
             </div>
             {ex.videoUrl && (
               <button
-                onClick={e => { e.stopPropagation(); setVideoOpen(true); }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); setVideoOpen(o => !o); }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: videoOpen ? 'rgba(255,0,0,0.25)' : 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
               >
-                ▶ Sample Video
+                {videoOpen ? '✕ Hide Video' : '▶ Sample Video'}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Inline video player */}
+      {videoOpen && ex.videoUrl && (
+        <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 16, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
+          <iframe
+            src={ex.videoUrl}
+            title={ex.name}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+          />
+        </div>
+      )}
 
       {/* Set checklist */}
       <div style={s.setList}>
@@ -292,46 +305,6 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         <div style={s.caption}>Tap a set to log it · rest timer starts automatically</div>
       )}
 
-      {/* Video modal */}
-      {videoOpen && ex.videoUrl && (
-        <div
-          onClick={() => setVideoOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.88)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '0 16px',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 480 }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{ex.name}</div>
-              <button
-                onClick={() => setVideoOpen(false)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 18, color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-              >
-                ✕
-              </button>
-            </div>
-            {/* 16:9 iframe container */}
-            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 14, overflow: 'hidden', background: '#111' }}>
-              <iframe
-                src={ex.videoUrl}
-                title={ex.name}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-              />
-            </div>
-            <div style={{ marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
-              Tap outside to close
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
