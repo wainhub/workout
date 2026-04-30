@@ -11,6 +11,8 @@ export default function MePage() {
   const { state, dispatch } = useStore();
   const [mounted, setMounted] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   useEffect(() => setMounted(true), []);
@@ -92,8 +94,41 @@ export default function MePage() {
 
       <div style={s.profileCard}>
         <div style={s.avatar}>{initials}</div>
-        <div>
-          <div style={s.userName}>{user?.name ?? 'User'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editingName ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const trimmed = nameInput.trim();
+                    if (trimmed && user) dispatch({ type: 'SIGN_IN', user: { ...user, name: trimmed } });
+                    setEditingName(false);
+                  }
+                  if (e.key === 'Escape') setEditingName(false);
+                }}
+                style={{ flex: 1, minWidth: 0, height: 36, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(161,240,194,0.4)', borderRadius: 8, color: '#fff', fontSize: 15, fontWeight: 700, padding: '0 10px', outline: 'none' }}
+              />
+              <button
+                onClick={() => { const t = nameInput.trim(); if (t && user) dispatch({ type: 'SIGN_IN', user: { ...user, name: t } }); setEditingName(false); }}
+                style={{ padding: '6px 10px', background: '#a1f0c2', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#062b18', cursor: 'pointer', flexShrink: 0 }}
+              >Save</button>
+              <button
+                onClick={() => setEditingName(false)}
+                style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, fontSize: 12, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', flexShrink: 0 }}
+              >✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={s.userName}>{user?.name ?? 'User'}</div>
+              <button
+                onClick={() => { setNameInput(user?.name ?? ''); setEditingName(true); }}
+                style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 6, padding: '3px 7px', fontSize: 11, color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}
+              >✎</button>
+            </div>
+          )}
           <div style={s.userEmail}>{user?.email ?? ''}</div>
           {user?.provider && user.provider !== 'email' && (
             <div style={s.providerBadge}>

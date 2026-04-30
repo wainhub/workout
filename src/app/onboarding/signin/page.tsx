@@ -56,12 +56,12 @@ export default function SignInPage() {
     setError('');
     try {
       const supabase = createClient();
+      // No emailRedirectTo — sends a 6-digit code only (no magic link).
+      // Magic links open in Safari on iOS, so the session never lands in the
+      // PWA's localStorage. Codes are entered directly in-app.
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { shouldCreateUser: true },
       });
       if (error) setError(error.message);
       else setStep('code');
@@ -194,8 +194,8 @@ export default function SignInPage() {
         {!showEmail
           ? 'Sign in to track your workouts and sync across devices.'
           : step === 'email'
-            ? "Enter your email — we'll send a sign-in link."
-            : `We sent a sign-in link to ${email}. Or enter the code below.`}
+            ? "Enter your email — we'll text you a 6-digit code."
+            : `Check your email for a 6-digit code and enter it below.`}
       </div>
       <div style={s.spacer} />
 
