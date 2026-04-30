@@ -98,6 +98,16 @@ export const EXERCISE_VIDEOS: Record<string, string> = {
   'Lateral Shuffle':                  'tOrdSBjIqjA',
   'Skater Jump':                      'L5bWMmSIbXs',
 
+  // Bodyweight-only variants (same movement as DB version, same tutorial applies)
+  'Bulgarian Split Squat':        'hiLF_pF3EJM',
+  'Step-Up':                      'DxUNi119Qzs',
+  'Single-Leg Hip Thrust':        'xDmFkJxPzeM',
+  'Chin-Up':                      'eGo4IYlbE5g',
+  // Bodyweight-specific exercises
+  'Archer Push-Up':               'C9lQhEI6mfA',
+  'Prone Snow Angel':             'ky1nW50Bms8',
+  'Single-Leg Calf Raise':        'fPbDcNDy8W4',
+
   // Lower B — Posterior Chain
   'DB Bulgarian Split Squat':     'hiLF_pF3EJM',
   'DB Stiff-Leg Deadlift':        'KE2A7G_nDc8',
