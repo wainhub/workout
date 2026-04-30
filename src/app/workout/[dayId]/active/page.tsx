@@ -44,11 +44,10 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const autoAfterRestRef = useRef<{ next: number; advance: boolean; restDur: number } | null>(null);
   const mountedRef = useRef(true);
 
-  // Reset everything when exercise changes
+  // Reset everything when exercise changes, and auto-open first set editor
   useEffect(() => {
     setWhyOpen(false);
     setVideoOpen(false);
-    setEditingSet(null);
     setRestActive(false);
     setRestSecs(0);
     setRestTarget(0);
@@ -61,6 +60,24 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     autoAfterRestRef.current = null;
     if (restRef.current) clearInterval(restRef.current);
     if (autoRef.current) clearInterval(autoRef.current);
+
+    // Auto-open first pending set for non-HIIT exercises
+    if (!session) { setEditingSet(null); return; }
+    const currentDay = program.days.find(d => d.id === session.dayId);
+    const currentEx = currentDay?.exercises[session.exIdx];
+    if (!currentEx) { setEditingSet(null); return; }
+    const timeBased = !!(currentEx.unit?.includes('sec') || currentEx.unit?.includes('min'));
+    if (timeBased) { setEditingSet(null); return; }
+    const currentSets: SetEntry[] = session.sessionLog[session.exIdx] ?? [];
+    const firstPending = currentSets.findIndex(s => s.status !== 'done' && s.status !== 'skipped');
+    if (firstPending >= 0) {
+      setEditingSet(firstPending);
+      setTempWeight(currentSets[firstPending].weight);
+      setTempReps(currentSets[firstPending].reps);
+    } else {
+      setEditingSet(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.exIdx]);
 
   useEffect(() => {
