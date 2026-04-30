@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
+import type { SessionLog } from '@/lib/types';
 
 const DAY_LABELS: Record<number, string> = { 1: 'Tue', 2: 'Wed', 3: 'Fri', 4: 'Sat' };
 
@@ -20,7 +21,7 @@ function getNextDay(program: ReturnType<typeof useActiveProgram>) {
 
 export default function HomePage() {
   const router = useRouter();
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const program = useActiveProgram();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -90,7 +91,25 @@ export default function HomePage() {
         </div>
         <button
           style={s.startBtn}
-          onClick={() => router.push(`/workout/${todayDay.id}`)}
+          onClick={() => {
+            // If a session for this day is already active, jump straight in
+            if (state.activeSession?.dayId === todayDay.id) {
+              router.push(`/workout/${todayDay.id}/active`);
+              return;
+            }
+            // Build session log and start immediately — skip the day overview
+            const week = weekByDay[todayDay.id] ?? 1;
+            const sessionLog: SessionLog = {};
+            todayDay.exercises.forEach((ex, i) => {
+              sessionLog[i] = Array.from({ length: ex.sets }, (_, j) => ({
+                weight: ex.lastSetWeights?.[j] ?? ex.weight,
+                reps: ex.lastSetReps?.[j] ?? ex.reps,
+                status: j === 0 ? 'active' : 'upcoming',
+              }));
+            });
+            dispatch({ type: 'START_SESSION', dayId: todayDay.id, week, sessionLog });
+            router.push(`/workout/${todayDay.id}/active`);
+          }}
         >
           Start workout
         </button>
