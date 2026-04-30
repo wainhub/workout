@@ -155,17 +155,41 @@ function LibraryPageInner() {
             )}
           </div>
 
-          {/* Right: quick-switch or expand chevron */}
-          {!isActive ? (
-            <button
-              onClick={() => { dispatch({ type: 'SET_ACTIVE_PROGRAM', programId: p.id }); router.push('/home'); }}
-              style={{ flexShrink: 0, padding: '7px 12px', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
-            >
-              Switch →
-            </button>
-          ) : (
-            <div onClick={() => toggleExpand(p.id)} style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', flexShrink: 0, cursor: 'pointer', transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'none' }}>›</div>
-          )}
+          {/* Right: actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {!isActive && (
+              <button
+                onClick={() => { dispatch({ type: 'SET_ACTIVE_PROGRAM', programId: p.id }); router.push('/home'); }}
+                style={{ padding: '7px 12px', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
+              >
+                Switch →
+              </button>
+            )}
+            {/* Trash icon — visible on all cards, requires confirmation */}
+            {state.programs.length > 1 && (
+              confirmDelete === p.id ? (
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDelete(null); }}
+                    style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+                  >Cancel</button>
+                  <button
+                    onClick={e => { e.stopPropagation(); dispatch({ type: 'DELETE_PROGRAM', programId: p.id }); setConfirmDelete(null); setExpandedId(null); }}
+                    style={{ padding: '6px 10px', background: 'rgba(255,60,60,0.2)', border: '1px solid rgba(255,60,60,0.3)', borderRadius: 999, fontSize: 12, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
+                  >Delete</button>
+                </div>
+              ) : (
+                <button
+                  onClick={e => { e.stopPropagation(); setConfirmDelete(p.id); }}
+                  style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, fontSize: 14, color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }}
+                  title="Delete program"
+                >🗑</button>
+              )
+            )}
+            {isActive && confirmDelete !== p.id && (
+              <div onClick={() => toggleExpand(p.id)} style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'none' }}>›</div>
+            )}
+          </div>
         </div>
 
         {/* Expanded detail */}
@@ -262,33 +286,6 @@ function LibraryPageInner() {
               </div>
             ))}
 
-            {/* Switch / Delete actions for inactive programs */}
-            {!isActive && (
-              <div style={{ marginTop: 4 }}>
-                {confirmDelete === p.id ? (
-                  <>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>Delete &ldquo;{p.name}&rdquo;? This can&apos;t be undone.</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => setConfirmDelete(null)}
-                        style={{ flex: 1, padding: '10px 0', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>Cancel</button>
-                      <button onClick={() => { dispatch({ type: 'DELETE_PROGRAM', programId: p.id }); setConfirmDelete(null); setExpandedId(null); }}
-                        style={{ flex: 1, padding: '10px 0', background: 'rgba(255,80,80,0.15)', border: '1px solid rgba(255,80,80,0.25)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#ff6b6b', cursor: 'pointer' }}>Delete</button>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => dispatch({ type: 'SET_ACTIVE_PROGRAM', programId: p.id })}
-                      style={{ flex: 1, padding: '10px 0', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}>
-                      Set as active
-                    </button>
-                    <button onClick={() => setConfirmDelete(p.id)}
-                      style={{ padding: '10px 14px', background: 'rgba(255,100,100,0.08)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#ff6b6b', cursor: 'pointer' }}>
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>
