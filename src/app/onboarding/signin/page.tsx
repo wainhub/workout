@@ -58,7 +58,10 @@ export default function SignInPage() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: { shouldCreateUser: true },
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) setError(error.message);
       else setStep('code');
@@ -191,8 +194,8 @@ export default function SignInPage() {
         {!showEmail
           ? 'Sign in to track your workouts and sync across devices.'
           : step === 'email'
-            ? "Enter your email and we'll send you a 6-digit code."
-            : `Enter the code we sent to ${email}`}
+            ? "Enter your email — we'll send a sign-in link."
+            : `We sent a sign-in link to ${email}. Or enter the code below.`}
       </div>
       <div style={s.spacer} />
 
