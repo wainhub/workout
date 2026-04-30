@@ -6,6 +6,7 @@ export interface Exercise {
   unit?: string;
   type: 'Compound' | 'Isolation';
   cue: string;
+  videoUrl?: string;
   lastSetWeights?: number[];
   lastSetReps?: number[];
 }

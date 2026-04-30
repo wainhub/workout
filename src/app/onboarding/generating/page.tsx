@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { getDays, buildReasoning } from '@/lib/data';
+import { getVideoEmbedUrl } from '@/lib/videos';
 import type { Program, IntakeAnswers } from '@/lib/types';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
@@ -16,7 +17,8 @@ const PHASES = [
   'Finalizing your program…',
 ];
 
-function buildProgram(answers: IntakeAnswers): Program {
+/** Rule-based fallback — used when the API fails or times out */
+function buildFallbackProgram(answers: IntakeAnswers): Program {
   const goalLabel: Record<string, string> = {
     hypertrophy: 'Build Muscle', strength: 'Get Stronger',
     fat_loss: 'Fat Loss', general: 'General Fitness',
@@ -27,7 +29,13 @@ function buildProgram(answers: IntakeAnswers): Program {
   const daysCount = Math.min(Number(answers.days ?? 4), 4);
 
   const allDays = getDays(equipment);
-  const programDays = allDays.slice(0, daysCount);
+  const programDays = allDays.slice(0, daysCount).map(day => ({
+    ...day,
+    exercises: day.exercises.map(ex => ({
+      ...ex,
+      videoUrl: getVideoEmbedUrl(ex.name),
+    })),
+  }));
   const reasoning = buildReasoning(goal, equipment, daysCount);
 
   return {
@@ -45,6 +53,17 @@ function buildProgram(answers: IntakeAnswers): Program {
   };
 }
 
+async function buildLLMProgram(answers: IntakeAnswers): Promise<Program> {
+  const res = await fetch('/api/generate-program', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const { program } = await res.json();
+  return program as Program;
+}
+
 function GeneratingPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,6 +71,7 @@ function GeneratingPageInner() {
   const { state, dispatch } = useStore();
   const [phase, setPhase] = useState(0);
   const [done, setDone] = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   useEffect(() => {
     let i = 0;
@@ -65,8 +85,18 @@ function GeneratingPageInner() {
       }
     }, 700);
 
-    const timeout = setTimeout(() => {
-      const program = buildProgram(state.intakeAnswers ?? {});
+    const answers = state.intakeAnswers ?? {};
+
+    // Run the LLM call concurrently with the animation
+    const programPromise = buildLLMProgram(answers).catch(() => {
+      setUsedFallback(true);
+      return buildFallbackProgram(answers);
+    });
+
+    // Wait for BOTH the animation AND the LLM response
+    const animationDuration = PHASES.length * 700 + 800;
+    const timeout = setTimeout(async () => {
+      const program = await programPromise;
       if (isNew) {
         dispatch({ type: 'ADD_PROGRAM', program });
         router.push('/onboarding/review?new=1');
@@ -74,9 +104,10 @@ function GeneratingPageInner() {
         dispatch({ type: 'COMPLETE_ONBOARDING', program });
         router.push('/onboarding/review');
       }
-    }, PHASES.length * 700 + 800);
+    }, animationDuration);
 
     return () => { clearInterval(interval); clearTimeout(timeout); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const s = {
@@ -111,6 +142,11 @@ function GeneratingPageInner() {
           </div>
         ))}
       </div>
+      {usedFallback && (
+        <div style={{ marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
+          Using offline program
+        </div>
+      )}
     </div>
   );
 }
