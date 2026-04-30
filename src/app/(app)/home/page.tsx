@@ -75,7 +75,7 @@ export default function HomePage() {
   return (
     <div style={s.screen}>
       <div style={s.kicker}>{formatDate()}</div>
-      <div style={s.greeting}>Hey Wain</div>
+      <div style={s.greeting}>Hey {state.user?.name?.split(' ')[0] ?? 'there'}</div>
       <div style={s.subline}>
         Week {currentWeek} · {program.daysCompleted} of {program.totalDays} sessions · {pct}% complete
       </div>

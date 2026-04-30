@@ -10,9 +10,9 @@ const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 10
 const FLOW = [
   { id: 'greet', bot: "Hi! I'm your AI coach. I'll ask 7 quick questions, then build a program shaped to you. Ready?", chips: [{ label: "Let's go", value: 'go' }] },
   { id: 'goal', bot: "What's your primary goal right now?", chips: [
-    { label: 'Hypertrophy (build muscle)', value: 'hypertrophy' },
-    { label: 'Strength', value: 'strength' },
-    { label: 'Fat loss', value: 'fat_loss' },
+    { label: 'Build muscle', value: 'hypertrophy' },
+    { label: 'Get stronger', value: 'strength' },
+    { label: 'Lose fat', value: 'fat_loss' },
     { label: 'General fitness', value: 'general' },
   ]},
   { id: 'experience', bot: "How long have you been training consistently?", chips: [
@@ -20,8 +20,8 @@ const FLOW = [
     { label: '6 months – 2 years', value: 'intermediate' },
     { label: '2+ years', value: 'advanced' },
   ]},
-  { id: 'days', bot: "How many days per week can you commit to?", chips: [
-    { label: '3 days', value: 3 }, { label: '4 days', value: 4 }, { label: '5 days', value: 5 },
+  { id: 'days', bot: "How many days per week can you commit to? (Programs are optimized for 3–5 days — more rest = more muscle growth)", chips: [
+    { label: '3 days', value: 3 }, { label: '4 days', value: 4 }, { label: '5 days', value: 5 }, { label: '6 days', value: 6 },
   ]},
   { id: 'session', bot: "How long is each session, realistically?", chips: [
     { label: '30 min', value: 30 }, { label: '45 min', value: 45 }, { label: '60 min', value: 60 }, { label: '75+ min', value: 75 },

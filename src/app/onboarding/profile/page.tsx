@@ -77,7 +77,7 @@ export default function ProfilePage() {
           onChange={e => setName(e.target.value)}
         />
 
-        <label style={s.label}>Sex (for program tuning)</label>
+        <label style={s.label}>Gender</label>
         <Segmented
           options={[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Other', value: 'other' }]}
           value={sex}
@@ -93,10 +93,18 @@ export default function ProfilePage() {
 
         <label style={s.label}>Birthday (optional)</label>
         <input
-          style={{ ...s.input, colorScheme: 'dark' }}
-          type="date"
+          style={s.input}
+          type="text"
+          placeholder="MM/DD/YYYY"
           value={birthday}
-          onChange={e => setBirthday(e.target.value)}
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+            let formatted = digits;
+            if (digits.length >= 5) formatted = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+            else if (digits.length >= 3) formatted = `${digits.slice(0,2)}/${digits.slice(2)}`;
+            setBirthday(formatted);
+          }}
+          inputMode="numeric"
         />
       </div>
 
