@@ -329,7 +329,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     pill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
     exLabel: { fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '0.1em' },
     exHeader: { display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
-    thumb: { width: 80, height: 45, borderRadius: 8, objectFit: 'cover' as const, flexShrink: 0, opacity: 0.8, border: '1px solid rgba(255,255,255,0.08)' },
+    thumb: { width: 112, height: 63, borderRadius: 10, objectFit: 'cover' as const, flexShrink: 0, opacity: 0.85, border: '1px solid rgba(255,255,255,0.1)' },
     exName: { fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', flex: 1 },
     exTarget: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 12 },
     cue: { padding: '11px 13px', background: 'rgba(161,240,194,0.07)', borderRadius: 12, fontSize: 13, lineHeight: 1.5, color: '#d6f5e2', display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 14, cursor: 'pointer', border: '1px solid rgba(161,240,194,0.12)' },
