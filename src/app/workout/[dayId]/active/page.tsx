@@ -3,7 +3,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { Stepper } from '@/components/Stepper';
-import { getVideoEmbedUrl } from '@/lib/videos';
+import { getVideoEmbedUrl, getExerciseImageUrl } from '@/lib/videos';
 import type { SetEntry } from '@/lib/types';
 
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
@@ -13,25 +13,64 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const program = useActiveProgram();
   const session = state.activeSession;
 
+  // UI state
   const [whyOpen, setWhyOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+
+  // Regular set editing
   const [editingSet, setEditingSet] = useState<number | null>(null);
   const [tempWeight, setTempWeight] = useState(0);
   const [tempReps, setTempReps] = useState(0);
+
+  // Rest timer
   const [restSecs, setRestSecs] = useState(0);
   const [restActive, setRestActive] = useState(false);
+  const [restTarget, setRestTarget] = useState(0);
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restEndCbRef = useRef<(() => void) | null>(null);
 
+  // HIIT auto-timer
+  const [autoStarted, setAutoStarted] = useState(false);
+  const [autoPhase, setAutoPhase] = useState<'work' | 'rest'>('work');
+  const [autoSecs, setAutoSecs] = useState(0);
+  const [autoSetIdx, setAutoSetIdx] = useState(0);
+  const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Refs to avoid stale closures inside timer callbacks
+  const setsRef = useRef<SetEntry[]>([]);
+  const isLastRef = useRef(false);
+  const exIdxRef = useRef(0);
+  const autoSetIdxRef = useRef(0);
+  const autoAfterRestRef = useRef<{ next: number; advance: boolean; restDur: number } | null>(null);
+  const mountedRef = useRef(true);
+
+  // Reset everything when exercise changes
   useEffect(() => {
     setWhyOpen(false);
     setVideoOpen(false);
     setEditingSet(null);
     setRestActive(false);
     setRestSecs(0);
+    setRestTarget(0);
+    setAutoStarted(false);
+    setAutoPhase('work');
+    setAutoSecs(0);
+    setAutoSetIdx(0);
+    autoSetIdxRef.current = 0;
+    restEndCbRef.current = null;
+    autoAfterRestRef.current = null;
     if (restRef.current) clearInterval(restRef.current);
+    if (autoRef.current) clearInterval(autoRef.current);
   }, [session?.exIdx]);
 
-  useEffect(() => () => { if (restRef.current) clearInterval(restRef.current); }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (restRef.current) clearInterval(restRef.current);
+      if (autoRef.current) clearInterval(autoRef.current);
+    };
+  }, []);
 
   if (!session || session.dayId !== Number(dayId)) {
     router.replace(`/workout/${dayId}`);
@@ -42,29 +81,120 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const ex = day.exercises[session.exIdx];
   const sets: SetEntry[] = session.sessionLog[session.exIdx] ?? [];
   const isLast = session.exIdx === day.exercises.length - 1;
+  const nextEx = !isLast ? day.exercises[session.exIdx + 1] : null;
   const allDone = sets.every(s => s.status === 'done' || s.status === 'skipped');
   const doneSets = sets.filter(s => s.status === 'done').length;
 
-  function startRest() {
+  // Keep refs fresh on every render
+  setsRef.current = sets;
+  isLastRef.current = isLast;
+  exIdxRef.current = session.exIdx;
+
+  const videoUrl = ex.videoUrl ?? getVideoEmbedUrl(ex.name);
+  const thumbUrl = getExerciseImageUrl(ex.name);
+  const isTimeBased = !!(ex.unit?.includes('sec') || ex.unit?.includes('min'));
+  const isWeighted = ex.weight > 0;
+  const repsLabel = isTimeBased ? (ex.unit?.includes('min') ? 'MINUTES' : 'SECONDS') : 'REPS';
+  const workDurSecs = ex.unit?.includes('min') ? Number(ex.reps) * 60 : Number(ex.reps);
+
+  const targetLine = (() => {
+    if (isWeighted) return `${sets.length} × ${ex.reps} reps @ ${ex.weight} ${ex.unit ?? 'lb'}`;
+    if (isTimeBased) return `${sets.length} × ${ex.reps} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
+    return `${sets.length} × ${ex.reps} reps · bodyweight`;
+  })();
+
+  function fmtTime(s: number) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : String(sec);
+  }
+  function fmtDone(w: number | undefined, r: number | undefined) {
+    if (isTimeBased) return `${r ?? 0}${ex.unit?.includes('min') ? 'min' : 's'}`;
+    if (!isWeighted) return `BW × ${r ?? 0}`;
+    return `${w ?? 0}lb × ${r ?? 0}`;
+  }
+  function fmtTarget(w: number, r: number) {
+    if (isTimeBased) return `${r} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
+    if (!isWeighted) return `BW · ${r}`;
+    return `${w}lb · ${r}`;
+  }
+
+  const exRestTarget = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
+  const restPct = restTarget > 0 ? (restSecs / restTarget) * 100 : 0;
+
+  // ── Navigation ────────────────────────────────────────────────────
+  function goNextExercise() {
+    dispatch({ type: 'ADVANCE_EXERCISE', exIdx: exIdxRef.current + 1 });
+    router.push(`/workout/${dayId}/active`);
+  }
+  function goSummary() {
+    dispatch({ type: 'START_REST', target: 0 });
+    router.push(`/workout/${dayId}/summary`);
+  }
+
+  // ── Rest timer ────────────────────────────────────────────────────
+  function startRest(onEnd?: () => void) {
     if (restRef.current) clearInterval(restRef.current);
-    const target = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
-    setRestSecs(target);
+    restEndCbRef.current = onEnd ?? null;
+    setRestTarget(exRestTarget);
+    setRestSecs(exRestTarget);
     setRestActive(true);
     restRef.current = setInterval(() => {
       setRestSecs(s => {
-        if (s <= 1) { clearInterval(restRef.current!); setRestActive(false); return 0; }
+        if (s <= 1) {
+          clearInterval(restRef.current!);
+          setRestActive(false);
+          const cb = restEndCbRef.current;
+          restEndCbRef.current = null;
+          if (cb) setTimeout(() => { if (mountedRef.current) cb(); }, 80);
+          return 0;
+        }
         return s - 1;
       });
     }, 1000);
   }
 
+  function skipRest() {
+    if (restRef.current) clearInterval(restRef.current);
+    setRestActive(false);
+    setRestSecs(0);
+    const cb = restEndCbRef.current;
+    restEndCbRef.current = null;
+    if (cb) setTimeout(() => { if (mountedRef.current) cb(); }, 50);
+  }
+
+  function adjustRest(delta: number) {
+    setRestSecs(s => Math.max(5, s + delta));
+    setRestTarget(t => Math.max(5, t + delta));
+  }
+
+  // ── Set operations (regular mode) ─────────────────────────────────
   function tapSet(i: number) {
     const s = sets[i];
-    if (s.status === 'done') return;
-    if (restActive) { clearInterval(restRef.current!); setRestActive(false); }
+    if (s.status === 'done' || s.status === 'skipped') return;
+    if (restActive) { clearInterval(restRef.current!); setRestActive(false); restEndCbRef.current = null; }
     setEditingSet(i);
     setTempWeight(s.weight);
     setTempReps(s.reps);
+  }
+
+  function resolveAfterLog(next: SetEntry[]) {
+    const justFinishedAll = next.every(s => s.status === 'done' || s.status === 'skipped');
+    if (justFinishedAll && isLastRef.current) {
+      startRest(() => goSummary());
+    } else if (justFinishedAll) {
+      startRest(() => goNextExercise());
+    } else {
+      const nextIdx = next.findIndex(s => s.status !== 'done' && s.status !== 'skipped');
+      const nextSet = next[nextIdx];
+      startRest(() => {
+        if (nextSet && mountedRef.current) {
+          setEditingSet(nextIdx);
+          setTempWeight(nextSet.weight);
+          setTempReps(nextSet.reps);
+        }
+      });
+    }
   }
 
   function logSet() {
@@ -76,13 +206,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     });
     dispatch({ type: 'UPDATE_SETS', exIdx: session!.exIdx, sets: next });
     setEditingSet(null);
-    const justFinishedAll = next.every(s => s.status === 'done' || s.status === 'skipped');
-    if (justFinishedAll && isLast) {
-      dispatch({ type: 'START_REST', target: 0 });
-      router.push(`/workout/${dayId}/summary`);
-    } else if (!justFinishedAll) {
-      startRest();
-    }
+    resolveAfterLog(next);
   }
 
   function skipSet(i: number) {
@@ -93,72 +217,150 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     });
     dispatch({ type: 'UPDATE_SETS', exIdx: session!.exIdx, sets: next });
     setEditingSet(null);
-    const justFinishedAll = next.every(s => s.status === 'done' || s.status === 'skipped');
-    if (justFinishedAll && isLast) {
-      dispatch({ type: 'START_REST', target: 0 });
-      router.push(`/workout/${dayId}/summary`);
-    } else if (!justFinishedAll) {
-      startRest();
+    resolveAfterLog(next);
+  }
+
+  // ── HIIT auto-timer ───────────────────────────────────────────────
+  function startAutoTimer() {
+    setAutoStarted(true);
+    runAutoWork(0, exRestTarget);
+  }
+
+  function runAutoWork(setIdx: number, restDur: number) {
+    if (!mountedRef.current) return;
+    if (autoRef.current) clearInterval(autoRef.current);
+    setAutoPhase('work');
+    setAutoSecs(workDurSecs);
+    setAutoSetIdx(setIdx);
+    autoSetIdxRef.current = setIdx;
+
+    autoRef.current = setInterval(() => {
+      setAutoSecs(prev => {
+        if (prev <= 1) {
+          clearInterval(autoRef.current!);
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            const idx = autoSetIdxRef.current;
+            const cur = setsRef.current;
+            const updated = cur.map((s, i) =>
+              i === idx
+                ? { ...s, status: 'done' as const, actualWeight: 0, actualReps: ex.reps }
+                : (i === idx + 1 && s.status === 'upcoming' ? { ...s, status: 'active' as const } : s)
+            );
+            dispatch({ type: 'UPDATE_SETS', exIdx: exIdxRef.current, sets: updated });
+            const nextSetIdx = idx + 1;
+            const advance = nextSetIdx >= cur.length;
+            runAutoRest(advance ? -1 : nextSetIdx, restDur, advance);
+          }, 100);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function runAutoRest(nextSetIdx: number, restDur: number, advance: boolean) {
+    if (!mountedRef.current) return;
+    if (autoRef.current) clearInterval(autoRef.current);
+    autoAfterRestRef.current = { next: nextSetIdx, advance, restDur };
+    setAutoPhase('rest');
+    setAutoSecs(restDur);
+
+    autoRef.current = setInterval(() => {
+      setAutoSecs(prev => {
+        if (prev <= 1) {
+          clearInterval(autoRef.current!);
+          setTimeout(() => { if (mountedRef.current) fireAfterAutoRest(); }, 100);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function fireAfterAutoRest() {
+    const info = autoAfterRestRef.current;
+    autoAfterRestRef.current = null;
+    if (!info) return;
+    if (info.advance) {
+      if (isLastRef.current) {
+        dispatch({ type: 'START_REST', target: 0 });
+        router.push(`/workout/${dayId}/summary`);
+      } else {
+        dispatch({ type: 'ADVANCE_EXERCISE', exIdx: exIdxRef.current + 1 });
+        router.push(`/workout/${dayId}/active`);
+      }
+    } else {
+      runAutoWork(info.next, info.restDur);
     }
   }
 
-  function goNextExercise() {
-    dispatch({ type: 'ADVANCE_EXERCISE', exIdx: session!.exIdx + 1 });
-    router.push(`/workout/${dayId}/active`);
+  function skipAutoRest() {
+    if (autoRef.current) clearInterval(autoRef.current);
+    setTimeout(() => { if (mountedRef.current) fireAfterAutoRest(); }, 50);
   }
 
-  function fmtRest(s: number) {
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }
-
-  // Resolve video URL: use stored value or fall back to the static map
-  const videoUrl = ex.videoUrl ?? getVideoEmbedUrl(ex.name);
-
-  // Display helpers — adapt labels for BW, time-based, and weighted exercises
-  const isTimeBased = ex.unit?.includes('sec') || ex.unit?.includes('min');
-  const isWeighted  = ex.weight > 0;
-  const repsLabel   = isTimeBased ? (ex.unit?.includes('min') ? 'MINUTES' : 'SECONDS') : 'REPS';
-  const targetLine  = (() => {
-    if (isWeighted) return `${sets.length} sets · ${ex.reps} reps · ${ex.weight} ${ex.unit ?? 'lb'} target`;
-    if (isTimeBased) return `${sets.length} sets · ${ex.reps} ${ex.unit?.includes('min') ? 'min' : 'sec'} holds`;
-    return `${sets.length} sets · ${ex.reps} reps · bodyweight`;
-  })();
-  function fmtDone(w: number | undefined, r: number | undefined) {
-    if (isTimeBased) return `${r ?? 0} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
-    if (!isWeighted) return `BW × ${r ?? 0} reps`;
-    return `${w ?? 0} lb × ${r ?? 0} reps`;
-  }
-  function fmtTarget(w: number, r: number) {
-    if (isTimeBased) return `${r} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
-    if (!isWeighted) return `BW · ${r} reps`;
-    return `${w} lb · ${r} reps`;
-  }
-
-  const restTarget = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
-  const restPct = restTarget > 0 ? (restSecs / restTarget) * 100 : 0;
-
+  // ── Styles ────────────────────────────────────────────────────────
   const s = {
-    screen: { paddingTop: 'var(--top)', paddingLeft: 16, paddingRight: 16, paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 18px)', maxWidth: 480, margin: '0 auto', minHeight: '100svh', background: '#000', display: 'flex', flexDirection: 'column' as const },
-    topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    screen: {
+      paddingTop: 'var(--top)', paddingLeft: 16, paddingRight: 16,
+      paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 18px)',
+      maxWidth: 480, margin: '0 auto', minHeight: '100svh',
+      background: '#000', display: 'flex', flexDirection: 'column' as const,
+    },
+    topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     pill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer' },
     exLabel: { fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '0.1em' },
-    exName: { fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 },
+    exHeader: { display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+    thumb: { width: 80, height: 45, borderRadius: 8, objectFit: 'cover' as const, flexShrink: 0, opacity: 0.8, border: '1px solid rgba(255,255,255,0.08)' },
+    exName: { fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', flex: 1 },
     exTarget: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 12 },
-    cue: { padding: '11px 13px', background: 'rgba(161,240,194,0.07)', borderRadius: 12, fontSize: 13, lineHeight: 1.5, color: '#d6f5e2', display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 16, cursor: 'pointer', border: '1px solid rgba(161,240,194,0.12)' },
+    cue: { padding: '11px 13px', background: 'rgba(161,240,194,0.07)', borderRadius: 12, fontSize: 13, lineHeight: 1.5, color: '#d6f5e2', display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 14, cursor: 'pointer', border: '1px solid rgba(161,240,194,0.12)' },
     setList: { display: 'flex', flexDirection: 'column' as const, gap: 8, flex: 1 },
-    nextBtn: { width: '100%', height: 54, background: '#a1f0c2', color: '#062b18', border: 'none', borderRadius: 27, fontSize: 16, fontWeight: 700, cursor: 'pointer', marginTop: 12 },
-    caption: { textAlign: 'center' as const, fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 8 },
+    // HIIT
+    hiitWrap: { flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: 14, paddingBottom: 24 },
+    hiitStartBtn: { width: '100%', height: 58, background: '#a1f0c2', color: '#062b18', border: 'none', borderRadius: 29, fontSize: 20, fontWeight: 800, cursor: 'pointer' },
+    hiitSkipBtn: { padding: '10px 28px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' },
+    // Rest timer
+    restBox: { marginTop: 12, padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14 },
+    restRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    adjBtn: { width: 32, height: 28, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   };
+
+  const totalEx = day.exercises.length;
+  const afterInfo = autoAfterRestRef.current;
 
   return (
     <div style={s.screen}>
+      {/* Top bar */}
       <div style={s.topBar}>
-        <button style={s.pill} onClick={() => router.push(`/workout/${dayId}`)}>← Day {dayId} · {day.name}</button>
-        <div style={s.exLabel}>EX {session.exIdx + 1}/{day.exercises.length}</div>
+        <button style={s.pill} onClick={() => router.push(`/workout/${dayId}`)}>← {day.name}</button>
+        <div style={s.exLabel}>EX {session.exIdx + 1} / {totalEx}</div>
       </div>
 
-      <div style={s.exName}>{ex.name}</div>
-      <div style={s.exTarget}>{targetLine}</div>
+      {/* Exercise progress bar (one segment per exercise) */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
+        {day.exercises.map((_, i) => (
+          <div key={i} style={{
+            flex: 1, height: 3, borderRadius: 2,
+            background: i < session.exIdx ? '#a1f0c2'
+              : i === session.exIdx ? 'rgba(161,240,194,0.45)'
+              : 'rgba(255,255,255,0.1)',
+          }} />
+        ))}
+      </div>
+
+      {/* Exercise header with optional thumbnail */}
+      <div style={s.exHeader}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={s.exName}>{ex.name}</div>
+          <div style={s.exTarget}>{targetLine}</div>
+        </div>
+        {thumbUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumbUrl} alt={ex.name} style={s.thumb} />
+        )}
+      </div>
 
       {/* Coach cue */}
       <div style={s.cue} onClick={() => setWhyOpen(o => !o)}>
@@ -167,7 +369,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           <div>{ex.cue}</div>
           {whyOpen && (
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(161,240,194,0.15)', fontSize: 12, lineHeight: 1.55, color: 'rgba(255,255,255,0.7)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: '#a1f0c2', textTransform: 'uppercase', marginBottom: 4 }}>Why this exercise</div>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: '#a1f0c2', textTransform: 'uppercase' as const, marginBottom: 4 }}>Why this exercise</div>
               {ex.type === 'Compound'
                 ? "It's your big driver today — the most muscle, the most strength carryover. Top set is calibrated to leave 1–2 reps in the tank. Push hard but don't grind."
                 : 'An accessory to round out the session. Slow eccentric, full stretch, controlled lockout. Form beats load here.'}
@@ -182,7 +384,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
                 onClick={e => { e.stopPropagation(); setVideoOpen(o => !o); }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: videoOpen ? 'rgba(255,0,0,0.25)' : 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
               >
-                {videoOpen ? '✕ Hide Video' : '▶ Sample Video'}
+                {videoOpen ? '✕ Hide' : '▶ Video'}
               </button>
             )}
           </div>
@@ -191,7 +393,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
 
       {/* Inline video player */}
       {videoOpen && videoUrl && (
-        <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 16, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
+        <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 14, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
           <iframe
             src={`${videoUrl}&autoplay=1`}
             title={ex.name}
@@ -202,134 +404,200 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         </div>
       )}
 
-      {/* Set checklist */}
-      <div style={s.setList}>
-        {sets.map((set, i) => {
-          const isDone = set.status === 'done';
-          const isSkipped = set.status === 'skipped';
-          const isEditing = editingSet === i;
-          const isNext = !isDone && !isSkipped && !isEditing && sets.slice(0, i).every(s => s.status === 'done' || s.status === 'skipped');
+      {/* ── HIIT auto-timer mode ───────────────────────────────── */}
+      {isTimeBased ? (
+        <div style={s.hiitWrap}>
+          {!autoStarted ? (
+            <>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center' as const, lineHeight: 1.6 }}>
+                {sets.length} sets · {fmtTime(workDurSecs)}s work · auto-advances between sets
+              </div>
+              <button style={s.hiitStartBtn} onClick={startAutoTimer}>▶ Start</button>
+            </>
+          ) : (
+            <>
+              {/* Phase label */}
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' as const,
+                color: autoPhase === 'work' ? '#a1f0c2' : 'rgba(255,255,255,0.4)',
+              }}>
+                {autoPhase === 'work' ? '● WORK' : '○ REST'}
+              </div>
 
-          return (
-            <div key={i}>
-              {/* Set row */}
-              <div
-                onClick={() => !isDone && !isSkipped && tapSet(i)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                  background: isDone ? 'rgba(161,240,194,0.08)' : isEditing ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
-                  border: isDone ? '1px solid rgba(161,240,194,0.25)' : isEditing ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 14, cursor: isDone || isSkipped ? 'default' : 'pointer',
-                  opacity: isSkipped ? 0.4 : 1,
-                }}
-              >
-                {/* Checkbox */}
-                <div style={{
-                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                  background: isDone ? '#a1f0c2' : 'rgba(255,255,255,0.08)',
-                  border: isDone ? 'none' : '2px solid rgba(255,255,255,0.2)',
-                  display: 'grid', placeItems: 'center',
-                  fontSize: 16, color: '#062b18',
-                }}>
-                  {isDone ? '✓' : ''}
-                </div>
+              {/* Big countdown */}
+              <div style={{
+                fontSize: 88, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.04em',
+                fontVariantNumeric: 'tabular-nums' as const,
+                color: autoPhase === 'work' ? '#fff' : 'rgba(255,255,255,0.35)',
+              }}>
+                {fmtTime(autoSecs)}
+              </div>
 
-                {/* Set info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: isDone ? '#a1f0c2' : 'rgba(255,255,255,0.4)', textTransform: 'uppercase' as const, marginBottom: 2 }}>
-                    SET {i + 1}{isSkipped ? ' · SKIPPED' : ''}
-                  </div>
-                  {isDone ? (
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#a1f0c2', fontVariantNumeric: 'tabular-nums' as const }}>
-                      {fmtDone(set.actualWeight, set.actualReps)}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <div style={{ padding: '3px 10px', background: 'rgba(255,255,255,0.08)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-                        {fmtTarget(set.weight, set.reps)}
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {/* Set progress dots */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {sets.map((set, i) => (
+                  <div key={i} style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: set.status === 'done' ? '#a1f0c2'
+                      : i === autoSetIdx && autoPhase === 'work' ? 'rgba(161,240,194,0.5)'
+                      : 'rgba(255,255,255,0.15)',
+                    transition: 'background 0.3s',
+                  }} />
+                ))}
+              </div>
 
-                {isNext && !isEditing && (
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#a1f0c2', textTransform: 'uppercase' as const }}>NEXT</div>
+              {/* Set label */}
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>
+                Set {autoSetIdx + 1} of {sets.length}
+                {doneSets > 0 && (
+                  <span style={{ color: '#a1f0c2', marginLeft: 8 }}>· {doneSets} done ✓</span>
                 )}
               </div>
 
-              {/* Inline editor */}
-              {isEditing && (
-                <div style={{ marginTop: 4, padding: '14px', background: 'rgba(255,255,255,0.06)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: isWeighted ? 'space-around' : 'center', marginBottom: 14 }}>
-                    {isWeighted && (
-                      <>
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>LOAD (lb)</div>
-                          <Stepper value={tempWeight} step={5} onChange={setTempWeight} />
-                        </div>
-                        <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.1)' }} />
-                      </>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>{repsLabel}</div>
-                      <Stepper value={tempReps} step={isTimeBased ? 5 : 1} min={1} onChange={setTempReps} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => skipSet(i)}
-                      style={{ flex: 1, height: 42, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-                    >
-                      Skip
-                    </button>
-                    <button
-                      onClick={logSet}
-                      style={{ flex: 2, height: 42, background: '#a1f0c2', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
-                    >
-                      Log set ✓
-                    </button>
-                  </div>
+              {/* Up next (rest phase only) */}
+              {autoPhase === 'rest' && afterInfo && (
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'center' as const }}>
+                  {afterInfo.advance
+                    ? (nextEx ? `Up next: ${nextEx.name}` : 'Last exercise — great work!')
+                    : `Up next: Set ${afterInfo.next + 1} of ${sets.length}`}
                 </div>
               )}
-            </div>
-          );
-        })}
-      </div>
 
-      {/* Inline rest timer */}
-      {restActive && (
-        <div style={{ marginTop: 12, padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-              Rest · <span style={{ color: '#a1f0c2', fontVariantNumeric: 'tabular-nums' as const }}>{fmtRest(restSecs)}</span>
-            </div>
-            <button
-              onClick={() => { clearInterval(restRef.current!); setRestActive(false); }}
-              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 8px' }}
-            >
-              Skip rest
-            </button>
-          </div>
-          <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${restPct}%`, background: 'linear-gradient(90deg, #a1f0c2, #6ec3e8)', borderRadius: 2, transition: 'width 1s linear' }} />
-          </div>
+              {/* Skip rest (rest phase only) */}
+              {autoPhase === 'rest' && (
+                <button style={s.hiitSkipBtn} onClick={skipAutoRest}>Skip Rest ⏭</button>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        /* ── Regular set checklist ─────────────────────────────── */
+        <div style={s.setList}>
+          {sets.map((set, i) => {
+            const isDone = set.status === 'done';
+            const isSkipped = set.status === 'skipped';
+            const isEditing = editingSet === i;
+            const isNext = !isDone && !isSkipped && !isEditing
+              && sets.slice(0, i).every(s => s.status === 'done' || s.status === 'skipped');
+
+            return (
+              <div key={i}>
+                <div
+                  onClick={() => !isDone && !isSkipped && tapSet(i)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                    background: isDone ? 'rgba(161,240,194,0.08)' : isEditing ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
+                    border: isDone ? '1px solid rgba(161,240,194,0.25)' : isEditing ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: 14, cursor: isDone || isSkipped ? 'default' : 'pointer',
+                    opacity: isSkipped ? 0.4 : 1,
+                  }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                    background: isDone ? '#a1f0c2' : 'rgba(255,255,255,0.08)',
+                    border: isDone ? 'none' : '2px solid rgba(255,255,255,0.2)',
+                    display: 'grid', placeItems: 'center',
+                    fontSize: 16, color: '#062b18',
+                  }}>
+                    {isDone ? '✓' : ''}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: isDone ? '#a1f0c2' : 'rgba(255,255,255,0.4)', textTransform: 'uppercase' as const, marginBottom: 2 }}>
+                      SET {i + 1}{isSkipped ? ' · SKIPPED' : ''}
+                    </div>
+                    {isDone ? (
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#a1f0c2', fontVariantNumeric: 'tabular-nums' as const }}>
+                        {fmtDone(set.actualWeight, set.actualReps)}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'inline-block', padding: '3px 10px', background: 'rgba(255,255,255,0.08)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+                        {fmtTarget(set.weight, set.reps)}
+                      </div>
+                    )}
+                  </div>
+                  {isNext && !isEditing && (
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#a1f0c2', textTransform: 'uppercase' as const }}>NEXT</div>
+                  )}
+                </div>
+
+                {/* Inline editor */}
+                {isEditing && (
+                  <div style={{ marginTop: 4, padding: 14, background: 'rgba(255,255,255,0.06)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: isWeighted ? 'space-around' : 'center', marginBottom: 14 }}>
+                      {isWeighted && (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>LOAD (lb)</div>
+                            <Stepper value={tempWeight} step={5} onChange={setTempWeight} />
+                          </div>
+                          <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.1)' }} />
+                        </>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>{repsLabel}</div>
+                        <Stepper value={tempReps} step={1} min={1} onChange={setTempReps} />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => skipSet(i)}
+                        style={{ flex: 1, height: 42, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        onClick={logSet}
+                        style={{ flex: 2, height: 42, background: '#a1f0c2', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
+                      >
+                        Log set ✓
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Footer CTA */}
-      {allDone && !isLast && (
-        <>
-          <button style={s.nextBtn} onClick={goNextExercise}>
-            Next exercise →
-          </button>
-          <div style={s.caption}>{doneSets} of {sets.length} sets logged</div>
-        </>
+      {/* Rest timer (regular mode) */}
+      {!isTimeBased && restActive && (
+        <div style={s.restBox}>
+          <div style={s.restRow}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+              Rest{' '}
+              <span style={{ color: '#a1f0c2', fontVariantNumeric: 'tabular-nums' as const, fontSize: 18 }}>
+                {fmtTime(restSecs)}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button style={s.adjBtn} onClick={() => adjustRest(-15)}>−</button>
+              <button style={s.adjBtn} onClick={() => adjustRest(+15)}>+</button>
+              <button
+                onClick={skipRest}
+                style={{ padding: '4px 10px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+          <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${restPct}%`, background: 'linear-gradient(90deg, #a1f0c2, #6ec3e8)', borderRadius: 2, transition: 'width 1s linear' }} />
+          </div>
+          {allDone && (
+            <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center' as const }}>
+              {isLast ? 'Rest then wrapping up…' : `Rest then: ${nextEx?.name ?? 'next exercise'}`}
+            </div>
+          )}
+        </div>
       )}
 
-      {!allDone && !editingSet && !restActive && (
-        <div style={s.caption}>Tap a set to log it · rest timer starts automatically</div>
+      {/* Hint */}
+      {!isTimeBased && !allDone && editingSet === null && !restActive && (
+        <div style={{ marginTop: 14, textAlign: 'center' as const, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+          Tap a set to log it · rest starts automatically
+        </div>
       )}
-
     </div>
   );
 }

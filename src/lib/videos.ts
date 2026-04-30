@@ -133,3 +133,10 @@ export function getVideoWatchUrl(exerciseName: string): string | undefined {
   if (!id) return undefined;
   return `https://www.youtube.com/watch?v=${id}`;
 }
+
+/** Returns a YouTube thumbnail image URL for a given exercise name, or undefined. */
+export function getExerciseImageUrl(exerciseName: string): string | undefined {
+  const id = EXERCISE_VIDEOS[exerciseName];
+  if (!id) return undefined;
+  return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+}

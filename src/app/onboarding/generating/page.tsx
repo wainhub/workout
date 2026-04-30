@@ -30,11 +30,9 @@ function buildFallbackProgram(answers: IntakeAnswers): Program {
   const goal = answers.goal ?? 'general';
   const equipment = answers.equipment ?? 'full_gym';
   const name = goalLabel[goal] ?? 'General Fitness';
-  // Flexibility/cardio don't need a day cap — use as-is (up to 4 fallback days)
-  const isStrength = !['flexibility', 'cardio'].includes(goal);
-  const daysCount = isStrength ? Math.min(Number(answers.days ?? 4), 4) : Math.min(Number(answers.days ?? 4), 4);
-
   const allDays = getDays(equipment, goal);
+  const daysCount = Math.min(Number(answers.days ?? 4), allDays.length);
+
   const programDays = allDays.slice(0, daysCount).map(day => ({
     ...day,
     exercises: day.exercises.map(ex => ({
