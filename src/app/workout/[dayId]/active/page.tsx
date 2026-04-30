@@ -193,7 +193,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       {videoOpen && videoUrl && (
         <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 16, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
           <iframe
-            src={videoUrl}
+            src={`${videoUrl}&autoplay=1`}
             title={ex.name}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
