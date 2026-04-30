@@ -136,11 +136,9 @@ function LibraryPageInner() {
         overflow: 'hidden',
       }}>
         {/* Summary row — always visible */}
-        <div
-          onClick={() => toggleExpand(p.id)}
-          style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Left: tap to expand */}
+          <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => toggleExpand(p.id)}>
             {isActive && (
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: '#a1f0c2', textTransform: 'uppercase' as const, marginBottom: 4 }}>
                 ✦ ACTIVE
@@ -156,7 +154,18 @@ function LibraryPageInner() {
               </div>
             )}
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'none' }}>›</div>
+
+          {/* Right: quick-switch or expand chevron */}
+          {!isActive ? (
+            <button
+              onClick={() => { dispatch({ type: 'SET_ACTIVE_PROGRAM', programId: p.id }); router.push('/home'); }}
+              style={{ flexShrink: 0, padding: '7px 12px', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 12, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
+            >
+              Switch →
+            </button>
+          ) : (
+            <div onClick={() => toggleExpand(p.id)} style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', flexShrink: 0, cursor: 'pointer', transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'none' }}>›</div>
+          )}
         </div>
 
         {/* Expanded detail */}

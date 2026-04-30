@@ -9,11 +9,13 @@ function formatDate() {
   return new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function getNextDay(program: ReturnType<typeof useActiveProgram>, weekByDay: Record<number, number>) {
-  // Return the day with the lowest week number (next to train)
-  return program.days.reduce((prev, cur) =>
-    weekByDay[cur.id] < weekByDay[prev.id] ? cur : prev
-  );
+function getNextDay(program: ReturnType<typeof useActiveProgram>) {
+  // Cycle through days based on how many sessions are completed in this program.
+  // daysCompleted = 0 → day[0], daysCompleted = 1 → day[1], etc.
+  // Works correctly when switching programs — no dependency on global weekByDay.
+  if (!program.days.length) return program.days[0];
+  const idx = program.daysCompleted % program.days.length;
+  return program.days[idx];
 }
 
 export default function HomePage() {
@@ -25,7 +27,7 @@ export default function HomePage() {
   if (!mounted) return <div style={{ minHeight: '100dvh', background: '#000' }} />;
   const { weekByDay } = state;
 
-  const todayDay = getNextDay(program, weekByDay);
+  const todayDay = getNextDay(program);
   const pct = Math.round((program.daysCompleted / program.totalDays) * 100);
   const currentWeek = Math.min(...Object.values(weekByDay));
 
