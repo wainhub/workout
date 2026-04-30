@@ -28,7 +28,7 @@ const FLOW = [
     { label: 'Build cardio / endurance', value: 'cardio' },
   ]},
   { id: 'experience', bot: "How long have you been training consistently?", chips: [
-    { label: 'New to lifting', value: 'beginner' },
+    { label: 'Just starting out', value: 'beginner' },
     { label: '6 months – 2 years', value: 'intermediate' },
     { label: '2+ years', value: 'advanced' },
   ]},

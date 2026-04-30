@@ -114,6 +114,26 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // Resolve video URL: use stored value or fall back to the static map
   const videoUrl = ex.videoUrl ?? getVideoEmbedUrl(ex.name);
 
+  // Display helpers — adapt labels for BW, time-based, and weighted exercises
+  const isTimeBased = ex.unit?.includes('sec') || ex.unit?.includes('min');
+  const isWeighted  = ex.weight > 0;
+  const repsLabel   = isTimeBased ? (ex.unit?.includes('min') ? 'MINUTES' : 'SECONDS') : 'REPS';
+  const targetLine  = (() => {
+    if (isWeighted) return `${sets.length} sets · ${ex.reps} reps · ${ex.weight} ${ex.unit ?? 'lb'} target`;
+    if (isTimeBased) return `${sets.length} sets · ${ex.reps} ${ex.unit?.includes('min') ? 'min' : 'sec'} holds`;
+    return `${sets.length} sets · ${ex.reps} reps · bodyweight`;
+  })();
+  function fmtDone(w: number | undefined, r: number | undefined) {
+    if (isTimeBased) return `${r ?? 0} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
+    if (!isWeighted) return `BW × ${r ?? 0} reps`;
+    return `${w ?? 0} lb × ${r ?? 0} reps`;
+  }
+  function fmtTarget(w: number, r: number) {
+    if (isTimeBased) return `${r} ${ex.unit?.includes('min') ? 'min' : 'sec'}`;
+    if (!isWeighted) return `BW · ${r} reps`;
+    return `${w} lb · ${r} reps`;
+  }
+
   const restTarget = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
   const restPct = restTarget > 0 ? (restSecs / restTarget) * 100 : 0;
 
@@ -138,7 +158,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       </div>
 
       <div style={s.exName}>{ex.name}</div>
-      <div style={s.exTarget}>{sets.length} sets · {ex.reps} reps · {ex.weight === 0 ? 'bodyweight' : `${ex.weight} ${ex.unit ?? 'lb'} target`}</div>
+      <div style={s.exTarget}>{targetLine}</div>
 
       {/* Coach cue */}
       <div style={s.cue} onClick={() => setWhyOpen(o => !o)}>
@@ -221,15 +241,12 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
                   </div>
                   {isDone ? (
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#a1f0c2', fontVariantNumeric: 'tabular-nums' as const }}>
-                      {set.actualWeight === 0 ? 'BW' : `${set.actualWeight} lb`} × {set.actualReps} reps
+                      {fmtDone(set.actualWeight, set.actualReps)}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <div style={{ padding: '3px 10px', background: 'rgba(255,255,255,0.08)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-                        {set.weight === 0 ? 'BW' : `${set.weight} lb`}
-                      </div>
-                      <div style={{ padding: '3px 10px', background: 'rgba(255,255,255,0.08)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-                        {set.reps} reps
+                        {fmtTarget(set.weight, set.reps)}
                       </div>
                     </div>
                   )}
@@ -243,15 +260,19 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
               {/* Inline editor */}
               {isEditing && (
                 <div style={{ marginTop: 4, padding: '14px', background: 'rgba(255,255,255,0.06)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.15)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: isWeighted ? 'space-around' : 'center', marginBottom: 14 }}>
+                    {isWeighted && (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>LOAD (lb)</div>
+                          <Stepper value={tempWeight} step={5} onChange={setTempWeight} />
+                        </div>
+                        <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.1)' }} />
+                      </>
+                    )}
                     <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>WEIGHT</div>
-                      <Stepper value={tempWeight} step={5} onChange={setTempWeight} />
-                    </div>
-                    <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.1)' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>REPS</div>
-                      <Stepper value={tempReps} step={1} min={1} onChange={setTempReps} />
+                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>{repsLabel}</div>
+                      <Stepper value={tempReps} step={isTimeBased ? 5 : 1} min={1} onChange={setTempReps} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
