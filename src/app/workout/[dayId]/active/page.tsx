@@ -3,6 +3,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { Stepper } from '@/components/Stepper';
+import { getVideoEmbedUrl } from '@/lib/videos';
 import type { SetEntry } from '@/lib/types';
 
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
@@ -110,6 +111,9 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
+  // Resolve video URL: use stored value or fall back to the static map
+  const videoUrl = ex.videoUrl ?? getVideoEmbedUrl(ex.name);
+
   const restTarget = ex.type === 'Compound' ? state.prefs.compoundRest : state.prefs.isolationRest;
   const restPct = restTarget > 0 ? (restSecs / restTarget) * 100 : 0;
 
@@ -153,7 +157,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
               {whyOpen ? 'Tap to collapse' : 'Tap for coach context'}
             </div>
-            {ex.videoUrl && (
+            {videoUrl && (
               <button
                 onClick={e => { e.stopPropagation(); setVideoOpen(o => !o); }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: videoOpen ? 'rgba(255,0,0,0.25)' : 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
@@ -166,10 +170,10 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       </div>
 
       {/* Inline video player */}
-      {videoOpen && ex.videoUrl && (
+      {videoOpen && videoUrl && (
         <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 16, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
           <iframe
-            src={ex.videoUrl}
+            src={videoUrl}
             title={ex.name}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
