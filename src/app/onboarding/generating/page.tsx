@@ -18,7 +18,7 @@ const PHASES = [
 
 function buildProgram(answers: IntakeAnswers): Program {
   const goalLabel: Record<string, string> = {
-    hypertrophy: 'Build Muscle', strength: 'Strength',
+    hypertrophy: 'Build Muscle', strength: 'Get Stronger',
     fat_loss: 'Fat Loss', general: 'General Fitness',
   };
   const goal = answers.goal ?? 'general';

@@ -173,15 +173,15 @@ export { getDays, buildReasoning };
 export const SEED_PROGRAMS: Program[] = [
   {
     id: 'p1',
-    name: 'Hypertrophy',
-    goal: 'Hypertrophy',
+    name: 'Build Muscle',
+    goal: 'Build Muscle',
     weeks: 12,
     daysPerWeek: 4,
     weeksCompleted: 2,
     daysCompleted: 9,
     totalDays: 48,
     createdAt: 'Apr 8, 2026',
-    reasoning: 'A 4-day upper/lower split is the gold standard for hypertrophy at the intermediate level — each muscle group is trained twice per week, hitting the 10–20 sets per muscle per week range that the literature consistently shows drives growth.',
+    reasoning: 'An upper/lower split hitting each muscle group twice per week is the gold standard for building muscle — enough stimulus to drive growth, enough rest to recover. Full gym access gives you the best tool for each movement.',
     days: FULL_GYM_DAYS,
   },
 ];
