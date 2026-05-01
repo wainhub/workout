@@ -16,6 +16,10 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // UI state
   const [whyOpen, setWhyOpen] = useState(false);
 
+  // MuscleWiki video
+  const [mwVideos, setMwVideos] = useState<{ url: string; angle: string; og_image?: string }[]>([]);
+  const [activeAngle, setActiveAngle] = useState<string>('SIDE');
+
   // Regular set editing
   const [editingSet, setEditingSet] = useState<number | null>(null);
   const [tempWeight, setTempWeight] = useState(0);
@@ -56,6 +60,8 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // Reset everything when exercise changes, and auto-open first set editor
   useEffect(() => {
     setWhyOpen(false);
+    setMwVideos([]);
+    setActiveAngle('SIDE');
     setRestActive(false);
     setRestSecs(0);
     setRestTarget(0);
@@ -100,6 +106,28 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       if (autoRef.current) clearInterval(autoRef.current);
     };
   }, []);
+
+  // Fetch MuscleWiki video for the current exercise
+  useEffect(() => {
+    if (!session) return;
+    const currentDay = program.days.find(d => d.id === session.dayId);
+    const exName = currentDay?.exercises[session.exIdx]?.name;
+    if (!exName) return;
+    let cancelled = false;
+    fetch(`/api/musclewiki?name=${encodeURIComponent(exName)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!cancelled && Array.isArray(data.videos) && data.videos.length > 0) {
+          setMwVideos(data.videos);
+          // Prefer SIDE view; fall back to first available
+          const hasSide = data.videos.some((v: { angle: string }) => v.angle === 'SIDE');
+          setActiveAngle(hasSide ? 'SIDE' : data.videos[0].angle);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.exIdx]);
 
   if (!session || session.dayId !== Number(dayId)) {
     router.replace(`/workout/${dayId}`);
@@ -394,29 +422,79 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
         ))}
       </div>
 
-      {/* Exercise header with optional thumbnail */}
-      <div style={s.exHeader}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={s.exName}>{ex.name}</div>
-          <div style={s.exTarget}>{targetLine}</div>
-        </div>
-        {thumbUrl && (
-          watchUrl ? (
-            <a href={watchUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, position: 'relative' as const, display: 'block' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumbUrl} alt={ex.name} style={s.thumb} />
-              <div style={{ position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 11, color: '#fff', marginLeft: 2 }}>▶</span>
-                </div>
-              </div>
-            </a>
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbUrl} alt={ex.name} style={s.thumb} />
-          )
-        )}
+      {/* Exercise name + target */}
+      <div style={{ marginBottom: 4 }}>
+        <div style={s.exName}>{ex.name}</div>
+        <div style={s.exTarget}>{targetLine}</div>
       </div>
+
+      {/* Video — MuscleWiki inline (preferred) or YouTube tap-out (fallback) */}
+      {(() => {
+        const videoForAngle = mwVideos.find(v => v.angle === activeAngle) ?? mwVideos[0];
+        const angles = [...new Set(mwVideos.map(v => v.angle))].filter(a => a === 'FRONT' || a === 'SIDE');
+
+        if (videoForAngle) {
+          return (
+            <div style={{ marginBottom: 12 }}>
+              <video
+                key={videoForAngle.url}
+                src={videoForAngle.url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster={mwVideos[0]?.og_image}
+                style={{ width: '100%', borderRadius: 14, background: '#111', display: 'block', aspectRatio: '16/9', objectFit: 'cover' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                {angles.length > 1 ? (
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 3, gap: 3 }}>
+                    {angles.map(angle => (
+                      <button
+                        key={angle}
+                        onClick={() => setActiveAngle(angle)}
+                        style={{
+                          padding: '4px 12px', border: 'none', borderRadius: 6,
+                          background: activeAngle === angle ? 'rgba(255,255,255,0.15)' : 'transparent',
+                          color: activeAngle === angle ? '#fff' : 'rgba(255,255,255,0.4)',
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' as const,
+                        }}
+                      >
+                        {angle.charAt(0) + angle.slice(1).toLowerCase()} view
+                      </button>
+                    ))}
+                  </div>
+                ) : <div />}
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>Powered by MuscleWiki</div>
+              </div>
+            </div>
+          );
+        }
+
+        // Fallback: YouTube thumbnail tap
+        if (thumbUrl) {
+          return (
+            <div style={{ marginBottom: 12 }}>
+              {watchUrl ? (
+                <a href={watchUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative' as const, borderRadius: 14, overflow: 'hidden' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbUrl} alt={ex.name} style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 16, color: '#fff', marginLeft: 3 }}>▶</span>
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumbUrl} alt={ex.name} style={{ width: '100%', borderRadius: 14, display: 'block', aspectRatio: '16/9', objectFit: 'cover' }} />
+              )}
+            </div>
+          );
+        }
+
+        return null;
+      })()}
 
       {/* Coach cue */}
       <div style={s.cue} onClick={() => setWhyOpen(o => !o)}>
