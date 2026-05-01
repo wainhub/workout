@@ -52,7 +52,7 @@ function ReviewPageInner() {
 
   return (
     <div style={s.screen}>
-      <button style={s.backBtn} onClick={() => router.push(`/onboarding/intake${isNew ? '?new=1' : ''}`)}>← Edit answers</button>
+      <button style={s.backBtn} onClick={() => router.push(`/onboarding/edit-answers${isNew ? '?new=1' : ''}`)}>← Edit answers</button>
       <div style={s.kicker}>✦ YOUR PROGRAM</div>
       <div style={s.title}>{program.name}</div>
 

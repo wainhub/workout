@@ -12,7 +12,7 @@ const SYSTEM_PROMPT = `You are an expert coach covering strength training, mobil
 - Day IDs must be sequential starting from 1
 - Match session length: 30 min = 3-4 exercises, 45 min = 5, 60 min = 6, 75+ min = 7-8
 - Respect injuries always: lower_back → no heavy deadlifts/good mornings; knees → no deep squats/lunges, use step-ups/leg press; shoulder_inj → no overhead press/upright rows
-- Apply emphasis: add 1 extra exercise toward the focus area when session length allows
+- Apply emphasis: add 1 extra exercise per focus area listed when session length allows (user may select multiple areas)
 
 ━━ EQUIPMENT RULES — HARD CONSTRAINTS, NON-NEGOTIABLE ━━
 - full_gym: barbells, cables, machines, dumbbells, all OK
@@ -165,7 +165,7 @@ function buildUserPrompt(answers: IntakeAnswers): string {
 - Session length: ${answers.session ?? 60} minutes
 - Equipment available: ${equipMap[equip] ?? equip}
 - EQUIPMENT WHITELIST (only these are allowed): ${equipWhitelist[equip] ?? equipWhitelist.full_gym}
-- Emphasis: ${answers.emphasis === 'none' ? 'No specific emphasis' : answers.emphasis}
+- Emphasis: ${(!answers.emphasis || answers.emphasis === 'none') ? 'No specific emphasis' : answers.emphasis.split(',').map((e: string) => ({ upper: 'Upper body', lower: 'Lower body', core: 'Core', arms: 'Arms', hips: 'Hips & glutes' } as Record<string, string>)[e.trim()] ?? e).join(' + ')}
 - Injuries/limitations: ${injuryMap[answers.injuries ?? 'none'] ?? answers.injuries}
 
 CRITICAL: Use the WEIGHT CALIBRATION table (bodyweight × multiplier for this experience level) to calculate all starting weights. Bodyweight = ${bodyweightLb ?? 140} lb. Do NOT use hardcoded defaults — calculate each weight from the formula and round to nearest 5 lb.

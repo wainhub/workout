@@ -212,10 +212,32 @@ function IntakePageInner() {
     pick({ label: `${bw} ${unit}`, value: bwLb });
   }
 
+  // Multi-select state for emphasis step
+  const [emphasisSelected, setEmphasisSelected] = useState<string[]>([]);
+  function toggleEmphasis(val: string) {
+    if (val === 'none') { setEmphasisSelected(['none']); return; }
+    setEmphasisSelected(prev => {
+      const without = prev.filter(v => v !== 'none');
+      return without.includes(val) ? without.filter(v => v !== val) : [...without, val];
+    });
+  }
+  function commitEmphasis() {
+    const val = emphasisSelected.length === 0 ? 'none' : emphasisSelected.join(',');
+    const EMPHASIS_LABELS: Record<string, string> = {
+      upper: 'Upper body', lower: 'Lower body', core: 'Core',
+      arms: 'Arms', hips: 'Hips & glutes', none: 'No preference',
+    };
+    const label = emphasisSelected.length === 0 || emphasisSelected[0] === 'none'
+      ? 'No preference'
+      : emphasisSelected.map(v => EMPHASIS_LABELS[v] ?? v).join(' + ');
+    pick({ label, value: val });
+  }
+
   const currentStep = FLOW[step];
   const isDaysStep = !typing && currentStep?.id === 'days';
   const isBodyweightStep = !typing && currentStep?.id === 'bodyweight';
-  const chips = !typing && !isDaysStep && !isBodyweightStep && step < FLOW.length ? currentStep.chips : [];
+  const isEmphasisStep = !typing && currentStep?.id === 'emphasis';
+  const chips = !typing && !isDaysStep && !isBodyweightStep && !isEmphasisStep && step < FLOW.length ? currentStep.chips : [];
   const progress = (step / (FLOW.length - 1)) * 100;
 
   const s = {
@@ -268,6 +290,38 @@ function IntakePageInner() {
         <DaysPicker onPick={pickDays} />
       ) : isBodyweightStep ? (
         <BodyweightPicker onPick={pickBodyweight} />
+      ) : isEmphasisStep ? (
+        <div style={{ ...s.chipBar, flexDirection: 'column' as const }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+            {FLOW.find(f => f.id === 'emphasis')!.chips.map((c, i) => {
+              const isActive = emphasisSelected.includes(String(c.value));
+              return (
+                <button
+                  key={i}
+                  onClick={() => toggleEmphasis(String(c.value))}
+                  style={{
+                    padding: '10px 14px',
+                    background: isActive ? '#a1f0c2' : 'rgba(255,255,255,0.07)',
+                    border: isActive ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 999,
+                    color: isActive ? '#062b18' : '#fff',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {isActive && c.value !== 'none' ? '✓ ' : ''}{c.label}
+                </button>
+              );
+            })}
+          </div>
+          {emphasisSelected.length > 0 && (
+            <button
+              onClick={commitEmphasis}
+              style={{ marginTop: 8, height: 46, background: '#a1f0c2', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
+            >
+              {emphasisSelected[0] === 'none' ? 'No preference — continue →' : `${emphasisSelected.length} area${emphasisSelected.length > 1 ? 's' : ''} selected — continue →`}
+            </button>
+          )}
+        </div>
       ) : (
         <div style={s.chipBar}>
           {chips.map((c, i) => (
