@@ -19,6 +19,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // MuscleWiki video
   const [mwVideos, setMwVideos] = useState<{ url: string; angle: string; og_image?: string }[]>([]);
   const [activeAngle, setActiveAngle] = useState<string>('SIDE');
+  const [ytOpen, setYtOpen] = useState(false);
 
   // Regular set editing
   const [editingSet, setEditingSet] = useState<number | null>(null);
@@ -62,6 +63,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     setWhyOpen(false);
     setMwVideos([]);
     setActiveAngle('SIDE');
+    setYtOpen(false);
     setRestActive(false);
     setRestSecs(0);
     setRestTarget(0);
@@ -471,23 +473,35 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           );
         }
 
-        // Fallback: YouTube thumbnail tap
-        if (thumbUrl) {
+        // Fallback: YouTube thumbnail → tap expands inline iframe
+        if (thumbUrl && watchUrl) {
+          const embedUrl = watchUrl.replace('watch?v=', 'embed/') + '?autoplay=1&rel=0&modestbranding=1&playsinline=1';
           return (
-            <div style={{ marginBottom: 12 }}>
-              {watchUrl ? (
-                <a href={watchUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative' as const, borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ marginBottom: 12, borderRadius: 14, overflow: 'hidden', background: '#111' }}>
+              {ytOpen ? (
+                <div style={{ position: 'relative' as const, aspectRatio: '16/9' }}>
+                  <iframe
+                    src={embedUrl}
+                    title={ex.name}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ position: 'absolute' as const, inset: 0, width: '100%', height: '100%', border: 'none' }}
+                  />
+                  <button
+                    onClick={() => setYtOpen(false)}
+                    style={{ position: 'absolute' as const, top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >✕</button>
+                </div>
+              ) : (
+                <div onClick={() => setYtOpen(true)} style={{ position: 'relative' as const, cursor: 'pointer', aspectRatio: '16/9' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={thumbUrl} alt={ex.name} style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover' }} />
+                  <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 16, color: '#fff', marginLeft: 3 }}>▶</span>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 18, color: '#fff', marginLeft: 4 }}>▶</span>
                     </div>
                   </div>
-                </a>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumbUrl} alt={ex.name} style={{ width: '100%', borderRadius: 14, display: 'block', aspectRatio: '16/9', objectFit: 'cover' }} />
+                </div>
               )}
             </div>
           );
