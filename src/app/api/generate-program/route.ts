@@ -14,13 +14,44 @@ const SYSTEM_PROMPT = `You are an expert coach covering strength training, mobil
 - Respect injuries always: lower_back → no heavy deadlifts/good mornings; knees → no deep squats/lunges, use step-ups/leg press; shoulder_inj → no overhead press/upright rows
 - Apply emphasis: add 1 extra exercise toward the focus area when session length allows
 
-━━ STRENGTH / FAT LOSS / GENERAL GOALS ━━
+━━ EQUIPMENT RULES — HARD CONSTRAINTS, NON-NEGOTIABLE ━━
+- full_gym: barbells, cables, machines, dumbbells, all OK
+- garage: barbell + rack + dumbbells ONLY — no cables, no machines, no cable crossovers, no lat pulldowns, no leg press
+- home_db: dumbbells + bench ONLY — no cables, no machines, no barbells. Use DB rows not cable rows. Use DB presses not bench press.
+- bw (bodyweight only): NO dumbbells, NO barbells, NO cables, NO machines, NO kettlebells. Every exercise must be bodyweight only (push-ups, pull-ups, dips, lunges, squats, planks, etc.). Set weight=0 and unit="BW" for all exercises.
+After writing the program, audit every exercise against the user's equipment. If any exercise requires equipment not available, replace it with an equivalent that uses only available equipment. Do not trust defaults — explicitly verify each exercise against the constraint.
+
+━━ GOAL-SPECIFIC RULES — APPLY BASED ON USER'S STATED GOAL ━━
+IF goal = "Build Muscle (hypertrophy)":
+  - Rep ranges: 8-12 for isolation, 6-10 for compounds
+  - Tempo cues, controlled eccentric emphasized
+  - Split: Upper/Lower or PPL for 4+ days
+  - Focus on progressive overload, mind-muscle connection
+
+IF goal = "Get Stronger (strength)":
+  - Rep ranges: 3-6, heavy compounds first, accessories 6-8 reps
+  - RPE cues, longer rest periods (2-3 min)
+  - Split: powerlifting-style or conjugate for 4+ days
+  - Focus on the big lifts: squat, bench, deadlift, press variants
+
+IF goal = "Lose Fat (fat loss)":
+  - Rep ranges: 12-20, circuit pairings noted in cues
+  - Short rest (45-60s), supersets where possible
+  - Higher volume, metabolic emphasis
+
+IF goal = "General Fitness":
+  - 3 full-body days (for 3 days/week), or Upper/Lower split (for 4 days)
+  - Mixed compound + isolation, moderate volume (3-4 sets, 10-15 reps)
+  - Conditioning finisher when session time allows
+  - Approachable, balanced — NOT a hypertrophy-specific program
+  - Do NOT use hypertrophy terminology in cues
+
+IF goal = "Stay in Shape":
+  - Mix of strength + conditioning, low time commitment
+  - Full-body workouts, 3 sets of 12-15 reps
+  - Include at least one cardio finisher per session
+
 - Match experience: beginner = simpler compounds, fewer exercises; advanced = more volume, intensifiers
-- Respect equipment: full_gym/garage = barbells+cables+machines+DBs; home_db = DBs+bench ONLY (no cables/machines/barbells); bw = bodyweight ONLY (weight=0, unit="BW")
-- Strength goal: rep ranges 3-6, heavy compounds first, RPE cues
-- Hypertrophy goal: 8-12 reps isolation, 6-10 compound, tempo cues, controlled eccentric
-- Fat loss goal: 12-20 reps, circuit pairings noted in cues, short rest noted
-- General: balanced mix, approachable language
 - For 5+ day programs use PPL or Upper/Lower/Full hybrid splits
 - Weight guidelines (starting, user adjusts): Barbell compounds: 95-135 beginner, 135-185 intermediate, 185-225+ advanced. DB compounds: 20-35 ea beginner, 35-55 intermediate, 55-80+ advanced. Isolation: 10-20 beginner, 20-40 intermediate, 30-60 advanced.
 
@@ -94,14 +125,26 @@ function buildUserPrompt(answers: IntakeAnswers): string {
     shoulder_inj: 'Shoulder issues',
   };
 
+  const equip = answers.equipment ?? 'full_gym';
+  const equipWhitelist: Record<string, string> = {
+    full_gym: 'barbells, dumbbells, cables, machines, pull-up bar, kettlebells',
+    home_db:  'dumbbells, bench — NOTHING ELSE. No barbells, no cables, no machines.',
+    garage:   'barbell, rack, dumbbells — NOTHING ELSE. No cables, no machines.',
+    bw:       'bodyweight only — NO equipment at all. No dumbbells, no barbells, no cables, no kettlebells.',
+  };
+
   return `Build me a personalized program with these details:
 - Goal: ${goalMap[answers.goal ?? 'general'] ?? answers.goal}
 - Experience: ${expMap[answers.experience ?? 'beginner'] ?? answers.experience}
 - Days per week: ${answers.days ?? 4}
 - Session length: ${answers.session ?? 60} minutes
-- Equipment: ${equipMap[answers.equipment ?? 'full_gym'] ?? answers.equipment}
+- Equipment available: ${equipMap[equip] ?? equip}
+- EQUIPMENT WHITELIST (only these are allowed): ${equipWhitelist[equip] ?? equipWhitelist.full_gym}
 - Emphasis: ${answers.emphasis === 'none' ? 'No specific emphasis' : answers.emphasis}
-- Injuries/limitations: ${injuryMap[answers.injuries ?? 'none'] ?? answers.injuries}`;
+- Injuries/limitations: ${injuryMap[answers.injuries ?? 'none'] ?? answers.injuries}
+
+IMPORTANT: Every exercise in this program must use ONLY the equipment listed in the whitelist above. After writing the program, verify each exercise. Replace any that require equipment not in the whitelist.
+The "reasoning" field must reference the user's actual stated goal (${goalMap[answers.goal ?? 'general'] ?? answers.goal}) and equipment by name — no generic boilerplate.`;
 }
 
 function attachVideos(days: Day[]): Day[] {

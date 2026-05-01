@@ -3,7 +3,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { Stepper } from '@/components/Stepper';
-import { getVideoEmbedUrl, getExerciseImageUrl } from '@/lib/videos';
+import { getExerciseImageUrl } from '@/lib/videos';
 import type { SetEntry } from '@/lib/types';
 
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
@@ -15,7 +15,6 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
 
   // UI state
   const [whyOpen, setWhyOpen] = useState(false);
-  const [videoOpen, setVideoOpen] = useState(false);
 
   // Regular set editing
   const [editingSet, setEditingSet] = useState<number | null>(null);
@@ -57,7 +56,6 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // Reset everything when exercise changes, and auto-open first set editor
   useEffect(() => {
     setWhyOpen(false);
-    setVideoOpen(false);
     setRestActive(false);
     setRestSecs(0);
     setRestTarget(0);
@@ -121,7 +119,6 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   isLastRef.current = isLast;
   exIdxRef.current = session.exIdx;
 
-  const videoUrl = ex.videoUrl ?? getVideoEmbedUrl(ex.name);
   const thumbUrl = getExerciseImageUrl(ex.name);
   const isTimeBased = !!(ex.unit?.includes('sec') || ex.unit?.includes('min'));
   const isWeighted = ex.weight > 0;
@@ -421,34 +418,11 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
                 : 'An accessory to round out the session. Slow eccentric, full stretch, controlled lockout. Form beats load here.'}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-              {whyOpen ? 'Tap to collapse' : 'Tap for coach context'}
-            </div>
-            {videoUrl && (
-              <button
-                onClick={e => { e.stopPropagation(); setVideoOpen(o => !o); }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', background: videoOpen ? 'rgba(255,0,0,0.25)' : 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.25)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#ff6b6b', cursor: 'pointer' }}
-              >
-                {videoOpen ? '✕ Hide' : '▶ Video'}
-              </button>
-            )}
+          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+            {whyOpen ? 'Tap to collapse' : 'Tap for coach context'}
           </div>
         </div>
       </div>
-
-      {/* Inline video player */}
-      {videoOpen && videoUrl && (
-        <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 14, background: '#111', aspectRatio: '16/9', position: 'relative' as const }}>
-          <iframe
-            src={`${videoUrl}&autoplay=1`}
-            title={ex.name}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-          />
-        </div>
-      )}
 
       {/* ── HIIT auto-timer mode ───────────────────────────────── */}
       {isTimeBased ? (
