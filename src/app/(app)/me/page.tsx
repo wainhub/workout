@@ -13,6 +13,9 @@ export default function MePage() {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [editingBW, setEditingBW] = useState(false);
+  const [bwInput, setBwInput] = useState('');
+  const [bwUnit, setBwUnit] = useState<'lb' | 'kg'>('lb');
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   useEffect(() => setMounted(true), []);
@@ -130,6 +133,60 @@ export default function MePage() {
             </div>
           )}
           <div style={s.userEmail}>{user?.email ?? ''}</div>
+
+          {/* Bodyweight */}
+          {editingBW ? (
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginTop: 8 }}>
+              <input
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                value={bwInput}
+                onChange={e => setBwInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const n = Number(bwInput);
+                    if (n > 60 && n < 500 && user) {
+                      const lb = bwUnit === 'kg' ? Math.round(n * 2.205) : n;
+                      dispatch({ type: 'SIGN_IN', user: { ...user, bodyweight: lb } });
+                    }
+                    setEditingBW(false);
+                  }
+                  if (e.key === 'Escape') setEditingBW(false);
+                }}
+                placeholder={bwUnit === 'lb' ? '150' : '68'}
+                style={{ width: 70, height: 32, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(161,240,194,0.4)', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 700, padding: '0 8px', outline: 'none', fontVariantNumeric: 'tabular-nums' as const }}
+              />
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 7, padding: 2, gap: 2 }}>
+                {(['lb', 'kg'] as const).map(u => (
+                  <button key={u} onClick={() => setBwUnit(u)} style={{ height: 26, width: 32, border: 'none', borderRadius: 6, background: bwUnit === u ? '#a1f0c2' : 'transparent', color: bwUnit === u ? '#062b18' : 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{u}</button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  const n = Number(bwInput);
+                  if (n > 60 && n < 500 && user) {
+                    const lb = bwUnit === 'kg' ? Math.round(n * 2.205) : n;
+                    dispatch({ type: 'SIGN_IN', user: { ...user, bodyweight: lb } });
+                  }
+                  setEditingBW(false);
+                }}
+                style={{ padding: '4px 8px', background: '#a1f0c2', border: 'none', borderRadius: 7, fontSize: 11, fontWeight: 700, color: '#062b18', cursor: 'pointer' }}
+              >Save</button>
+              <button onClick={() => setEditingBW(false)} style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 7, fontSize: 11, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+                {user?.bodyweight ? `${user.bodyweight} lb` : 'Bodyweight not set'}
+              </span>
+              <button
+                onClick={() => { setBwInput(user?.bodyweight ? String(user.bodyweight) : ''); setBwUnit('lb'); setEditingBW(true); }}
+                style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 6, padding: '2px 6px', fontSize: 10, color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+              >✎</button>
+            </div>
+          )}
+
           {user?.provider && user.provider !== 'email' && (
             <div style={s.providerBadge}>
               {user.provider === 'apple' ? '🍎 Apple' : 'G Google'}

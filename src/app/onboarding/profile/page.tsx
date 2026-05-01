@@ -59,8 +59,12 @@ export default function ProfilePage() {
   function next() {
     if (!canContinue) return;
     dispatch({ type: 'SIGN_IN', user: { ...state.user!, name: name.trim() } });
-    // Carry gender into intakeAnswers so the AI receives it
-    dispatch({ type: 'SET_INTAKE_ANSWERS', answers: { ...(state.intakeAnswers ?? {}), gender: sex } });
+    // Carry gender + stored bodyweight into intakeAnswers so the AI receives them
+    dispatch({ type: 'SET_INTAKE_ANSWERS', answers: {
+      ...(state.intakeAnswers ?? {}),
+      gender: sex,
+      ...(state.user?.bodyweight ? { bodyweight: state.user.bodyweight } : {}),
+    }});
     router.push('/onboarding/intake');
   }
 

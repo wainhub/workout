@@ -78,6 +78,7 @@ export interface User {
   name: string;
   email: string;
   provider: 'apple' | 'google' | 'email';
+  bodyweight?: number; // stored in lb
 }
 
 export interface IntakeAnswers {

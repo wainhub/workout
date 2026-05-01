@@ -56,8 +56,8 @@ const FLOW = [
 
 interface Message { role: 'bot' | 'user'; text: string }
 
-function BodyweightPicker({ onPick }: { onPick: (bw: number, unit: 'lb' | 'kg') => void }) {
-  const [value, setValue] = useState('');
+function BodyweightPicker({ onPick, initialLb }: { onPick: (bw: number, unit: 'lb' | 'kg') => void; initialLb?: number }) {
+  const [value, setValue] = useState(initialLb ? String(initialLb) : '');
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
   const num = Number(value);
   const valid = num > 60 && num < 500;
@@ -209,6 +209,8 @@ function IntakePageInner() {
 
   function pickBodyweight(bw: number, unit: 'lb' | 'kg') {
     const bwLb = unit === 'kg' ? Math.round(bw * 2.205) : bw;
+    // Persist to user profile so future programs pre-fill it
+    if (state.user) dispatch({ type: 'SIGN_IN', user: { ...state.user, bodyweight: bwLb } });
     pick({ label: `${bw} ${unit}`, value: bwLb });
   }
 
@@ -289,7 +291,7 @@ function IntakePageInner() {
       {isDaysStep ? (
         <DaysPicker onPick={pickDays} />
       ) : isBodyweightStep ? (
-        <BodyweightPicker onPick={pickBodyweight} />
+        <BodyweightPicker onPick={pickBodyweight} initialLb={state.user?.bodyweight} />
       ) : isEmphasisStep ? (
         <div style={{ ...s.chipBar, flexDirection: 'column' as const }}>
           <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>

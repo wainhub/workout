@@ -240,6 +240,10 @@ function EditAnswersInner() {
 
   function regenerate() {
     dispatch({ type: 'SET_INTAKE_ANSWERS', answers: local });
+    // Keep user's bodyweight in sync if it changed here
+    if (local.bodyweight && state.user && local.bodyweight !== state.user.bodyweight) {
+      dispatch({ type: 'SIGN_IN', user: { ...state.user, bodyweight: local.bodyweight } });
+    }
     router.push(`/onboarding/generating${isNew ? '?new=1' : ''}`);
   }
 
