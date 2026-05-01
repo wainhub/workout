@@ -3,7 +3,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { Stepper } from '@/components/Stepper';
-import { getExerciseImageUrl } from '@/lib/videos';
+import { getExerciseImageUrl, getVideoWatchUrl } from '@/lib/videos';
 import type { SetEntry } from '@/lib/types';
 
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
@@ -120,6 +120,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   exIdxRef.current = session.exIdx;
 
   const thumbUrl = getExerciseImageUrl(ex.name);
+  const watchUrl = getVideoWatchUrl(ex.name);
   const isTimeBased = !!(ex.unit?.includes('sec') || ex.unit?.includes('min'));
   const isWeighted = ex.weight > 0;
   const repsLabel = isTimeBased ? (ex.unit?.includes('min') ? 'MINUTES' : 'SECONDS') : 'REPS';
@@ -400,8 +401,20 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           <div style={s.exTarget}>{targetLine}</div>
         </div>
         {thumbUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbUrl} alt={ex.name} style={s.thumb} />
+          watchUrl ? (
+            <a href={watchUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, position: 'relative' as const, display: 'block' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumbUrl} alt={ex.name} style={s.thumb} />
+              <div style={{ position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#fff', marginLeft: 2 }}>▶</span>
+                </div>
+              </div>
+            </a>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbUrl} alt={ex.name} style={s.thumb} />
+          )
         )}
       </div>
 
