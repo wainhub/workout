@@ -59,6 +59,8 @@ export default function ProfilePage() {
   function next() {
     if (!canContinue) return;
     dispatch({ type: 'SIGN_IN', user: { ...state.user!, name: name.trim() } });
+    // Carry gender into intakeAnswers so the AI receives it
+    dispatch({ type: 'SET_INTAKE_ANSWERS', answers: { ...(state.intakeAnswers ?? {}), gender: sex } });
     router.push('/onboarding/intake');
   }
 

@@ -32,6 +32,7 @@ const FLOW = [
     { label: '6 months – 2 years', value: 'intermediate' },
     { label: '2+ years', value: 'advanced' },
   ]},
+  { id: 'bodyweight', bot: "What's your bodyweight? (We use this to set your starting weights — a 130 lb person and a 200 lb person should not start with the same bench press.)", chips: [] },
   { id: 'days', bot: "How many days per week can you commit to?", chips: [] },
   { id: 'session', bot: "How long is each session, realistically?", chips: [
     { label: '30 min', value: 30 }, { label: '45 min', value: 45 }, { label: '60 min', value: 60 }, { label: '75+ min', value: 75 },
@@ -54,6 +55,62 @@ const FLOW = [
 ];
 
 interface Message { role: 'bot' | 'user'; text: string }
+
+function BodyweightPicker({ onPick }: { onPick: (bw: number, unit: 'lb' | 'kg') => void }) {
+  const [value, setValue] = useState('');
+  const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
+  const num = Number(value);
+  const valid = num > 60 && num < 500;
+
+  return (
+    <div style={{ padding: '14px 16px', paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 60px)', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input
+          type="number"
+          inputMode="decimal"
+          placeholder={unit === 'lb' ? '150' : '68'}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && valid && onPick(num, unit)}
+          autoFocus
+          style={{
+            flex: 1, height: 54, background: 'rgba(255,255,255,0.07)',
+            border: `1px solid ${valid ? 'rgba(161,240,194,0.4)' : 'rgba(255,255,255,0.15)'}`,
+            borderRadius: 12, color: '#fff', fontSize: 22, fontWeight: 700,
+            padding: '0 16px', outline: 'none', boxSizing: 'border-box',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        />
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4, gap: 4 }}>
+          {(['lb', 'kg'] as const).map(u => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              style={{
+                height: 46, width: 48, border: 'none', borderRadius: 9,
+                background: unit === u ? '#a1f0c2' : 'transparent',
+                color: unit === u ? '#062b18' : 'rgba(255,255,255,0.5)',
+                fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}
+            >{u}</button>
+          ))}
+        </div>
+      </div>
+      <button
+        disabled={!valid}
+        onClick={() => onPick(num, unit)}
+        style={{
+          width: '100%', height: 48, background: valid ? '#a1f0c2' : 'rgba(255,255,255,0.08)',
+          color: valid ? '#062b18' : 'rgba(255,255,255,0.3)',
+          border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700,
+          cursor: valid ? 'pointer' : 'default',
+        }}
+      >
+        {valid ? `${num} ${unit} — continue →` : 'Enter your bodyweight'}
+      </button>
+    </div>
+  );
+}
 
 function DaysPicker({ onPick }: { onPick: (days: number) => void }) {
   const [selected, setSelected] = useState<number | null>(null);
@@ -112,9 +169,10 @@ function IntakePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isNew = searchParams.get('new') === '1';
-  const { dispatch } = useStore();
+  const { state, dispatch } = useStore();
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<IntakeAnswers>({});
+  // Seed from store so gender (set in profile) carries forward
+  const [answers, setAnswers] = useState<IntakeAnswers>(state.intakeAnswers ?? {});
   const [messages, setMessages] = useState<Message[]>([{ role: 'bot', text: FLOW[0].bot }]);
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -149,9 +207,15 @@ function IntakePageInner() {
     pick({ label: `${days} ${days === 1 ? 'day' : 'days'} per week`, value: days });
   }
 
+  function pickBodyweight(bw: number, unit: 'lb' | 'kg') {
+    const bwLb = unit === 'kg' ? Math.round(bw * 2.205) : bw;
+    pick({ label: `${bw} ${unit}`, value: bwLb });
+  }
+
   const currentStep = FLOW[step];
   const isDaysStep = !typing && currentStep?.id === 'days';
-  const chips = !typing && !isDaysStep && step < FLOW.length ? currentStep.chips : [];
+  const isBodyweightStep = !typing && currentStep?.id === 'bodyweight';
+  const chips = !typing && !isDaysStep && !isBodyweightStep && step < FLOW.length ? currentStep.chips : [];
   const progress = (step / (FLOW.length - 1)) * 100;
 
   const s = {
@@ -202,6 +266,8 @@ function IntakePageInner() {
 
       {isDaysStep ? (
         <DaysPicker onPick={pickDays} />
+      ) : isBodyweightStep ? (
+        <BodyweightPicker onPick={pickBodyweight} />
       ) : (
         <div style={s.chipBar}>
           {chips.map((c, i) => (

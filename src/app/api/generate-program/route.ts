@@ -53,7 +53,21 @@ IF goal = "Stay in Shape":
 
 - Match experience: beginner = simpler compounds, fewer exercises; advanced = more volume, intensifiers
 - For 5+ day programs use PPL or Upper/Lower/Full hybrid splits
-- Weight guidelines (starting, user adjusts): Barbell compounds: 95-135 beginner, 135-185 intermediate, 185-225+ advanced. DB compounds: 20-35 ea beginner, 35-55 intermediate, 55-80+ advanced. Isolation: 10-20 beginner, 20-40 intermediate, 30-60 advanced.
+
+━━ WEIGHT CALIBRATION — ANCHOR TO BODYWEIGHT, NOT GENDER ━━
+The user will provide their bodyweight in pounds. Use these bodyweight-relative starting weights:
+
+  Barbell bench press:   beginner=0.35×BW, intermediate=0.55×BW, advanced=0.8×BW
+  Barbell squat:         beginner=0.5×BW,  intermediate=0.8×BW,  advanced=1.1×BW
+  Barbell deadlift:      beginner=0.6×BW,  intermediate=0.9×BW,  advanced=1.3×BW
+  Barbell overhead press: beginner=0.2×BW, intermediate=0.35×BW, advanced=0.55×BW
+  DB compound (ea.):     beginner=0.08×BW, intermediate=0.14×BW, advanced=0.2×BW
+  DB isolation (ea.):    beginner=0.04×BW, intermediate=0.08×BW, advanced=0.12×BW
+
+Round all calculated weights to the nearest 5 lb. If the user's bodyweight is unknown, default to 140 lb to avoid over-estimating.
+ALWAYS use the lower end: it is far better to start too light than too heavy. The user will adjust from session one.
+
+Experience level mapping: beginner = "Just starting out", intermediate = "6 months – 2 years", advanced = "2+ years"
 
 ━━ FLEXIBILITY GOAL ━━
 - All exercises: weight = 0, unit = "sec" for holds (30-60 sec typical), or "ea. BW" for dynamic reps
@@ -133,9 +147,20 @@ function buildUserPrompt(answers: IntakeAnswers): string {
     bw:       'bodyweight only — NO equipment at all. No dumbbells, no barbells, no cables, no kettlebells.',
   };
 
+  const genderMap: Record<string, string> = {
+    male: 'Male',
+    female: 'Female',
+    other: 'Non-binary / other',
+  };
+
+  const gender = answers.gender ?? 'unspecified';
+  const bodyweightLb = answers.bodyweight ? Number(answers.bodyweight) : null;
+
   return `Build me a personalized program with these details:
 - Goal: ${goalMap[answers.goal ?? 'general'] ?? answers.goal}
+- Gender: ${genderMap[gender] ?? gender}
 - Experience: ${expMap[answers.experience ?? 'beginner'] ?? answers.experience}
+- Bodyweight: ${bodyweightLb ? `${bodyweightLb} lb` : 'not provided — use 140 lb as default'}
 - Days per week: ${answers.days ?? 4}
 - Session length: ${answers.session ?? 60} minutes
 - Equipment available: ${equipMap[equip] ?? equip}
@@ -143,8 +168,9 @@ function buildUserPrompt(answers: IntakeAnswers): string {
 - Emphasis: ${answers.emphasis === 'none' ? 'No specific emphasis' : answers.emphasis}
 - Injuries/limitations: ${injuryMap[answers.injuries ?? 'none'] ?? answers.injuries}
 
-IMPORTANT: Every exercise in this program must use ONLY the equipment listed in the whitelist above. After writing the program, verify each exercise. Replace any that require equipment not in the whitelist.
-The "reasoning" field must reference the user's actual stated goal (${goalMap[answers.goal ?? 'general'] ?? answers.goal}) and equipment by name — no generic boilerplate.`;
+CRITICAL: Use the WEIGHT CALIBRATION table (bodyweight × multiplier for this experience level) to calculate all starting weights. Bodyweight = ${bodyweightLb ?? 140} lb. Do NOT use hardcoded defaults — calculate each weight from the formula and round to nearest 5 lb.
+Every exercise must use ONLY the equipment whitelist above. After writing, verify each exercise and replace any violations.
+The "reasoning" field must reference this user's actual goal, experience, bodyweight, and starting weights — no generic boilerplate.`;
 }
 
 function attachVideos(days: Day[]): Day[] {

@@ -83,6 +83,8 @@ export interface User {
 export interface IntakeAnswers {
   goal?: string;
   experience?: string;
+  gender?: string;
+  bodyweight?: number;
   days?: number;
   session?: number;
   equipment?: string;
