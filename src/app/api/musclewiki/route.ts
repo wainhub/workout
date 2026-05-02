@@ -35,17 +35,17 @@ function toSearchQuery(name: string): string {
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name');
+  const debug = req.nextUrl.searchParams.get('debug') === '1';
   if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400, headers: CORS_HEADERS });
 
   const cacheKey = name.toLowerCase();
-  if (cache.has(cacheKey)) {
+  if (cache.has(cacheKey) && !debug) {
     return NextResponse.json({ videos: cache.get(cacheKey) }, { headers: CORS_HEADERS });
   }
 
   const apiKey = process.env.MUSCLEWIKI_API_KEY;
   if (!apiKey) {
-    // No key configured — return empty so UI falls back to YouTube
-    return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
+    return NextResponse.json({ error: 'no_key', videos: [] }, { headers: CORS_HEADERS });
   }
 
   try {
@@ -55,12 +55,13 @@ export async function GET(req: NextRequest) {
       `https://api.musclewiki.com/search?query=${encodeURIComponent(query)}&limit=3`,
       {
         headers: { 'X-API-Key': apiKey },
-        // Cache at the Next.js fetch layer for 24h to minimise API call count
         next: { revalidate: 86400 },
       }
     );
 
     if (!searchRes.ok) {
+      const errBody = await searchRes.text();
+      if (debug) return NextResponse.json({ debug: { status: searchRes.status, body: errBody, query } }, { headers: CORS_HEADERS });
       cache.set(cacheKey, []);
       return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
     }
@@ -69,6 +70,10 @@ export async function GET(req: NextRequest) {
     const exercises: MWExercise[] = Array.isArray(searchData)
       ? searchData
       : (searchData.exercises ?? []);
+
+    if (debug) {
+      return NextResponse.json({ debug: { query, exercises: exercises.slice(0, 3), raw: searchData } }, { headers: CORS_HEADERS });
+    }
 
     if (exercises.length === 0) {
       cache.set(cacheKey, []);
