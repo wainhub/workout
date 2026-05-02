@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     const query = toSearchQuery(name);
 
     const searchRes = await fetch(
-      `https://api.musclewiki.com/search?query=${encodeURIComponent(query)}&limit=3`,
+      `https://api.musclewiki.com/search?q=${encodeURIComponent(query)}&limit=3`,
       {
         headers: { 'X-API-Key': apiKey },
         next: { revalidate: 86400 },
