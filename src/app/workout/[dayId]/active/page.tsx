@@ -441,7 +441,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
             <div style={{ marginBottom: 12 }}>
               <video
                 key={videoForAngle.url}
-                src={videoForAngle.url}
+                src={apiUrl(`/api/musclewiki/video?url=${encodeURIComponent(videoForAngle.url)}`)}
                 autoPlay
                 muted
                 loop
