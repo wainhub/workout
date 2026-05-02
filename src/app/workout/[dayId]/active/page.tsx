@@ -474,40 +474,6 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
           );
         }
 
-        // Fallback: YouTube thumbnail → tap expands inline iframe
-        if (thumbUrl && watchUrl) {
-          const embedUrl = watchUrl.replace('watch?v=', 'embed/') + '?autoplay=1&rel=0&modestbranding=1&playsinline=1';
-          return (
-            <div style={{ marginBottom: 12, borderRadius: 14, overflow: 'hidden', background: '#111' }}>
-              {ytOpen ? (
-                <div style={{ position: 'relative' as const, aspectRatio: '16/9' }}>
-                  <iframe
-                    src={embedUrl}
-                    title={ex.name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    style={{ position: 'absolute' as const, inset: 0, width: '100%', height: '100%', border: 'none' }}
-                  />
-                  <button
-                    onClick={() => setYtOpen(false)}
-                    style={{ position: 'absolute' as const, top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >✕</button>
-                </div>
-              ) : (
-                <div onClick={() => setYtOpen(true)} style={{ position: 'relative' as const, cursor: 'pointer', aspectRatio: '16/9' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={thumbUrl} alt={ex.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute' as const, inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 18, color: '#fff', marginLeft: 4 }}>▶</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        }
-
         return null;
       })()}
 
