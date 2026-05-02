@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { getDays, buildReasoning } from '@/lib/data';
 import { getVideoEmbedUrl } from '@/lib/videos';
+import { apiUrl } from '@/lib/api';
 import type { Program, IntakeAnswers } from '@/lib/types';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
@@ -58,7 +59,7 @@ function buildFallbackProgram(answers: IntakeAnswers): Program {
 }
 
 async function buildLLMProgram(answers: IntakeAnswers): Promise<Program> {
-  const res = await fetch('/api/generate-program', {
+  const res = await fetch(apiUrl('/api/generate-program'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ answers }),

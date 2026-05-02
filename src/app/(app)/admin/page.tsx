@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase';
+import { apiUrl } from '@/lib/api';
 
 const ADMIN_EMAILS = ['wain@kellum.net', 'wain_kellum@hotmail.com'];
 const GREEN = '#a1f0c2';
@@ -166,7 +167,7 @@ export default function AdminPage() {
     try {
       const token = await getToken();
       if (!token) { setError('No active session — please sign in again.'); setLoading(false); return; }
-      const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(apiUrl('/api/admin/users'), { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.error ?? `Request failed (${res.status})`); setLoading(false); return; }
       const data = await res.json();
       setUsers(data.users ?? []);
@@ -183,7 +184,7 @@ export default function AdminPage() {
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch(`/api/admin/users/detail?userId=${userId}`, {
+      const res = await fetch(apiUrl(`/api/admin/users/detail?userId=${userId}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -209,7 +210,7 @@ export default function AdminPage() {
     try {
       const token = await getToken();
       if (!token) { setError('No active session.'); return; }
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch(apiUrl('/api/admin/users'), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
@@ -230,7 +231,7 @@ export default function AdminPage() {
     try {
       const token = await getToken();
       if (!token) return;
-      const res = await fetch('/api/admin/feedback', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(apiUrl('/api/admin/feedback'), { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) { const d = await res.json(); setFeedback(d.feedback ?? []); }
     } finally { setFeedbackLoading(false); }
   }
@@ -238,7 +239,7 @@ export default function AdminPage() {
   async function deleteFeedback(id: string) {
     const token = await getToken();
     if (!token) return;
-    await fetch('/api/admin/feedback', {
+    await fetch(apiUrl('/api/admin/feedback'), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),

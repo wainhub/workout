@@ -77,7 +77,7 @@ export interface Prefs {
 export interface User {
   name: string;
   email: string;
-  provider: 'apple' | 'google' | 'email';
+  provider: 'apple' | 'google' | 'email' | 'guest';
   bodyweight?: number; // stored in lb
 }
 

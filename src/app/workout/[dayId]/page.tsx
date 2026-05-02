@@ -17,6 +17,8 @@ function estTime(exercises: { sets: number; type: string }[]) {
 
 const BLANK_FORM = { name: '', type: 'Compound' as 'Compound' | 'Isolation', sets: 3, reps: 10, weight: 0, unit: '' };
 
+// Pre-generate pages for up to 7 days (covers all seed + AI programs)
+
 export default function DayPage({ params }: { params: Promise<{ dayId: string }> }) {
   const { dayId } = use(params);
   const router = useRouter();

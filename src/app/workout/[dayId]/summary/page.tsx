@@ -36,7 +36,6 @@ function coachDebrief(dayName: string, sessionLog: SessionLog, exercises: { name
 
   return `Strong ${dayName} session. Your heaviest work was on ${hEx?.name ?? 'the main lift'} — ${hWeight === 0 ? 'bodyweight' : `${hWeight} lb × ${hReps} reps`}. If every set felt solid at that weight, bump it by 5 lb next session. Rest, recover, and come back stronger.`;
 }
-
 export default function SummaryPage({ params }: { params: Promise<{ dayId: string }> }) {
   const { dayId } = use(params);
   const router = useRouter();

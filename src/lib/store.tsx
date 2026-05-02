@@ -262,8 +262,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {}
 
-    // Sync to Supabase (debounced 2s) when user is logged in
-    if (!state.user) return;
+    // Sync to Supabase (debounced 2s) when user is logged in with a real account
+    if (!state.user || state.user.provider === 'guest') return;
     const timer = setTimeout(async () => {
       try {
         const supabase = createClient();

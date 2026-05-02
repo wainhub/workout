@@ -278,6 +278,21 @@ export default function SignInPage() {
       )}
 
       <div style={s.fine}>By continuing you agree to our Terms of Service and Privacy Policy.</div>
+
+      <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 24, width: '100%', maxWidth: 320 }}>
+        <button
+          onClick={() => {
+            dispatch({ type: 'SIGN_IN', user: { provider: 'guest', email: '', name: 'You' } });
+            router.replace('/onboarding/profile');
+          }}
+          style={{ width: '100%', padding: '14px 0', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.55)', cursor: 'pointer' }}
+        >
+          Continue without account
+        </button>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 10, textAlign: 'center' as const, lineHeight: 1.5 }}>
+          Your data stays on this device only. No sync across devices.
+        </div>
+      </div>
     </div>
   );
 }

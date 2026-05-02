@@ -2,6 +2,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import type { IntakeAnswers, Program, Day, Exercise } from '@/lib/types';
 import { getVideoEmbedUrl } from '@/lib/videos';
+import { CORS_HEADERS } from '@/lib/cors';
+
+// Allow Capacitor app to call this endpoint
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
 
 const client = new Anthropic();
 
@@ -231,9 +237,9 @@ export async function POST(req: NextRequest) {
       }),
     };
 
-    return NextResponse.json({ program });
+    return NextResponse.json({ program }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[generate-program]', err);
-    return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Generation failed' }, { status: 500, headers: CORS_HEADERS });
   }
 }

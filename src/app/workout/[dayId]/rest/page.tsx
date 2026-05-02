@@ -166,7 +166,6 @@ function RestPageInner({ params }: { params: Promise<{ dayId: string }> }) {
     </div>
   );
 }
-
 export default function RestPage({ params }: { params: Promise<{ dayId: string }> }) {
   return (
     <Suspense fallback={<div style={{ minHeight: '100svh', background: '#000' }} />}>

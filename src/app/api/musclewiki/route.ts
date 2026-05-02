@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CORS_HEADERS } from '@/lib/cors';
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
 
 export interface MWVideo {
   url: string;
@@ -30,17 +35,17 @@ function toSearchQuery(name: string): string {
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name');
-  if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400 });
+  if (!name) return NextResponse.json({ error: 'Missing name' }, { status: 400, headers: CORS_HEADERS });
 
   const cacheKey = name.toLowerCase();
   if (cache.has(cacheKey)) {
-    return NextResponse.json({ videos: cache.get(cacheKey) });
+    return NextResponse.json({ videos: cache.get(cacheKey) }, { headers: CORS_HEADERS });
   }
 
   const apiKey = process.env.MUSCLEWIKI_API_KEY;
   if (!apiKey) {
     // No key configured — return empty so UI falls back to YouTube
-    return NextResponse.json({ videos: [] });
+    return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
   }
 
   try {
@@ -57,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     if (!searchRes.ok) {
       cache.set(cacheKey, []);
-      return NextResponse.json({ videos: [] });
+      return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
     }
 
     const searchData = await searchRes.json();
@@ -67,7 +72,7 @@ export async function GET(req: NextRequest) {
 
     if (exercises.length === 0) {
       cache.set(cacheKey, []);
-      return NextResponse.json({ videos: [] });
+      return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
     }
 
     let videos: MWVideo[] = exercises[0].videos ?? [];
@@ -85,10 +90,10 @@ export async function GET(req: NextRequest) {
     }
 
     cache.set(cacheKey, videos);
-    return NextResponse.json({ videos });
+    return NextResponse.json({ videos }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[musclewiki]', err);
     cache.set(cacheKey, []);
-    return NextResponse.json({ videos: [] });
+    return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
   }
 }

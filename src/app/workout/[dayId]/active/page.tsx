@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { Stepper } from '@/components/Stepper';
 import { getExerciseImageUrl, getVideoWatchUrl } from '@/lib/videos';
+import { apiUrl } from '@/lib/api';
 import type { SetEntry } from '@/lib/types';
 
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
@@ -116,7 +117,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
     const exName = currentDay?.exercises[session.exIdx]?.name;
     if (!exName) return;
     let cancelled = false;
-    fetch(`/api/musclewiki?name=${encodeURIComponent(exName)}`)
+    fetch(apiUrl(`/api/musclewiki?name=${encodeURIComponent(exName)}`))
       .then(r => r.json())
       .then(data => {
         if (!cancelled && Array.isArray(data.videos) && data.videos.length > 0) {
