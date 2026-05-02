@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ videos }, { headers: CORS_HEADERS });
   } catch (err) {
     console.error('[musclewiki]', err);
+    if (debug) return NextResponse.json({ debug: { error: String(err) } }, { headers: CORS_HEADERS });
     cache.set(cacheKey, []);
     return NextResponse.json({ videos: [] }, { headers: CORS_HEADERS });
   }
