@@ -24,11 +24,13 @@ export default function HomePage() {
   const { state, dispatch } = useStore();
   const program = useActiveProgram();
   const [mounted, setMounted] = useState(false);
+  const [selectedDayId, setSelectedDayId] = useState<number | null>(null);
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div style={{ minHeight: '100dvh', background: '#000' }} />;
   const { weekByDay } = state;
 
-  const todayDay = getNextDay(program);
+  const suggestedDay = getNextDay(program);
+  const todayDay = program.days.find(d => d.id === selectedDayId) ?? suggestedDay;
   const pct = Math.round((program.daysCompleted / program.totalDays) * 100);
   const currentWeek = Math.min(...Object.values(weekByDay));
 
@@ -46,6 +48,12 @@ export default function HomePage() {
     heroKicker: { fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase' as const, color: '#a1f0c2' },
     heroTitle: { fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 },
     heroMeta: { fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 3 },
+    dayChips: { display: 'flex', gap: 6, marginTop: 12 },
+    dayChipBtn: (active: boolean) => ({
+      padding: '5px 12px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+      background: active ? '#a1f0c2' : 'rgba(255,255,255,0.1)',
+      color: active ? '#062b18' : 'rgba(255,255,255,0.55)',
+    }),
     startBtn: {
       marginTop: 12, width: '100%', padding: '14px 0',
       background: '#a1f0c2', color: '#062b18', border: 'none',
@@ -84,11 +92,26 @@ export default function HomePage() {
       </div>
 
       <div style={s.heroCard}>
-        <div style={s.heroKicker}>★ TODAY · DAY {todayDay.id}</div>
+        <div style={s.heroKicker}>
+          {todayDay.id === suggestedDay.id ? '★ SUGGESTED · DAY ' : 'DAY '}{todayDay.id}
+        </div>
         <div style={s.heroTitle}>{todayDay.name}</div>
         <div style={s.heroMeta}>
-          {todayDay.exercises.length} exercises · ~52 min · Week {weekByDay[todayDay.id]}
+          {todayDay.exercises.length} exercises · ~{Math.round(todayDay.exercises.reduce((n, e) => n + e.sets * (e.type === 'Compound' ? 135 : 120), 0) / 60)} min · Week {weekByDay[todayDay.id]}
         </div>
+        {program.days.length > 1 && (
+          <div style={s.dayChips}>
+            {program.days.map(d => (
+              <button
+                key={d.id}
+                style={s.dayChipBtn(d.id === todayDay.id)}
+                onClick={() => setSelectedDayId(d.id === todayDay.id && selectedDayId !== null ? null : d.id)}
+              >
+                Day {d.id}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           style={s.startBtn}
           onClick={() => {
@@ -117,21 +140,21 @@ export default function HomePage() {
 
       <div style={s.sectionHead}>This week</div>
       {program.days.map(day => {
-        const isToday = day.id === todayDay.id;
+        const isSelected = day.id === todayDay.id;
         return (
           <div
             key={day.id}
-            style={{ ...s.dayRow, borderColor: isToday ? 'rgba(161,240,194,0.2)' : 'rgba(255,255,255,0.08)' }}
-            onClick={() => router.push(`/workout/${day.id}`)}
+            style={{ ...s.dayRow, borderColor: isSelected ? 'rgba(161,240,194,0.2)' : 'rgba(255,255,255,0.08)' }}
+            onClick={() => setSelectedDayId(day.id)}
           >
             <div style={s.dayRowLeft}>
-              <div style={s.dayChip(isToday)}>D{day.id}</div>
+              <div style={s.dayChip(isSelected)}>D{day.id}</div>
               <div>
                 <div style={s.dayName}>{day.name}</div>
                 <div style={s.dayFocus}>{day.focus.split(' · ').slice(0, 2).join(' · ')}</div>
               </div>
             </div>
-            <div style={s.weekTag(isToday)}>WK {weekByDay[day.id]}</div>
+            <div style={s.weekTag(isSelected)}>WK {weekByDay[day.id]}</div>
           </div>
         );
       })}
