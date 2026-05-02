@@ -260,7 +260,7 @@ export default function SignInPage() {
             type="text"
             inputMode="numeric"
             placeholder="000000"
-            maxLength={8}
+            maxLength={6}
             value={code}
             onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
             onKeyDown={e => e.key === 'Enter' && verifyCode()}
