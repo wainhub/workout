@@ -252,7 +252,7 @@ export default function MePage() {
 
       <div style={s.section}>Account</div>
 
-      {user?.email === 'wain@kellum.net' && (
+      {['wain@kellum.net', 'wain_kellum@hotmail.com'].includes(user?.email ?? '') && (
         <div
           style={{ ...s.row, cursor: 'pointer' }}
           onClick={() => router.push('/admin')}

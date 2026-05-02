@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createBrowserClient } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_EMAIL = 'wain@kellum.net';
+const ADMIN_EMAILS = ['wain@kellum.net', 'wain_kellum@hotmail.com'];
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization') ?? '';
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const browserClient = createBrowserClient();
   const { data: { user }, error } = await browserClient.auth.getUser(token);
-  if (error || !user || user.email !== ADMIN_EMAIL) {
+  if (error || !user || !ADMIN_EMAILS.includes(user.email ?? '')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -42,7 +42,7 @@ export async function DELETE(req: NextRequest) {
 
   const browserClient = createBrowserClient();
   const { data: { user }, error } = await browserClient.auth.getUser(token);
-  if (error || !user || user.email !== ADMIN_EMAIL) {
+  if (error || !user || !ADMIN_EMAILS.includes(user.email ?? '')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

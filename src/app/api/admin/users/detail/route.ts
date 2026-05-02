@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createBrowserClient } from '@/lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_EMAIL = 'wain@kellum.net';
+const ADMIN_EMAILS = ['wain@kellum.net', 'wain_kellum@hotmail.com'];
 
 async function getAdminClient(req: NextRequest) {
   const authHeader = req.headers.get('authorization') ?? '';
@@ -11,7 +11,7 @@ async function getAdminClient(req: NextRequest) {
 
   const browserClient = createBrowserClient();
   const { data: { user }, error: userError } = await browserClient.auth.getUser(token);
-  if (userError || !user || user.email !== ADMIN_EMAIL) {
+  if (userError || !user || !ADMIN_EMAILS.includes(user.email ?? '')) {
     return { error: 'Forbidden', status: 403, adminClient: null };
   }
 

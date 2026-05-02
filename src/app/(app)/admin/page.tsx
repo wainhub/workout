@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase';
 
-const ADMIN_EMAIL = 'wain@kellum.net';
+const ADMIN_EMAILS = ['wain@kellum.net', 'wain_kellum@hotmail.com'];
 const GREEN = '#a1f0c2';
 
 interface SupabaseUser {
@@ -247,7 +247,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (user?.email !== ADMIN_EMAIL) return;
+    if (!ADMIN_EMAILS.includes(user?.email ?? '')) return;
     fetchUsers();
     fetchFeedback();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,7 +270,7 @@ export default function AdminPage() {
     errorBox: { background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 14, padding: 16, fontSize: 13, color: '#ff8a8a' },
   };
 
-  if (user?.email !== ADMIN_EMAIL) {
+  if (!ADMIN_EMAILS.includes(user?.email ?? '')) {
     return <div style={s.screen}><div style={s.denied}>Access denied.</div></div>;
   }
 
@@ -357,7 +357,7 @@ export default function AdminPage() {
                         {u.last_sign_in_at ? ` · Last seen ${fmtDate(u.last_sign_in_at)}` : ''}
                       </div>
                     </div>
-                    {u.email !== ADMIN_EMAIL && (
+                    {!ADMIN_EMAILS.includes(u.email ?? '') && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(confirmDeleteId === u.id ? null : u.id); }}
                         style={{ background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8, padding: '5px 10px', color: '#ff6b6b', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
