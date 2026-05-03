@@ -99,11 +99,19 @@ export default function ProfilePage() {
 
         <label style={s.label}>Birthday (optional)</label>
         <input
-          style={{ ...s.input, colorScheme: 'dark' }}
-          type="date"
+          style={s.input}
+          type="text"
+          inputMode="numeric"
+          placeholder="MM/DD/YYYY"
           value={birthday}
-          onChange={e => setBirthday(e.target.value)}
-          max={new Date().toISOString().split('T')[0]}
+          onChange={e => {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+            if (v.length >= 6) v = v.slice(0, 5) + '/' + v.slice(5);
+            if (v.length > 10) v = v.slice(0, 10);
+            setBirthday(v);
+          }}
+          maxLength={10}
         />
       </div>
 
