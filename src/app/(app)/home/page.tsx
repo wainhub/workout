@@ -31,8 +31,22 @@ export default function HomePage() {
 
   const suggestedDay = getNextDay(program);
   const todayDay = program.days.find(d => d.id === selectedDayId) ?? suggestedDay;
-  const pct = Math.round((program.daysCompleted / program.totalDays) * 100);
-  const currentWeek = Math.min(...Object.values(weekByDay));
+
+  // Workouts in the last 7 days
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const last7 = state.history.filter(h => h.completedAt >= sevenDaysAgo).length;
+  const totalDone = state.history.length;
+
+  // Last completed date per day
+  function lastDoneLabel(dayId: number): string {
+    const last = state.history.find(h => h.dayId === dayId);
+    if (!last) return '';
+    const diffMs = Date.now() - last.completedAt;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays}d ago`;
+  }
 
   const s = {
     screen: { paddingTop: 'var(--top)', paddingLeft: 16, paddingRight: 16, minHeight: '100%' },
@@ -88,7 +102,7 @@ export default function HomePage() {
       <div style={s.kicker}>{formatDate()}</div>
       <div style={s.greeting}>Hey {state.user?.name?.split(' ')[0] ?? 'there'}</div>
       <div style={s.subline}>
-        Week {currentWeek} · {program.daysCompleted} of {program.totalDays} sessions · {pct}% complete
+        {last7} {last7 === 1 ? 'workout' : 'workouts'} this week · {totalDone} total
       </div>
 
       <div style={s.heroCard}>
@@ -97,7 +111,7 @@ export default function HomePage() {
         </div>
         <div style={s.heroTitle}>{todayDay.name}</div>
         <div style={s.heroMeta}>
-          {todayDay.exercises.length} exercises · ~{Math.round(todayDay.exercises.reduce((n, e) => n + e.sets * (e.type === 'Compound' ? 135 : 120), 0) / 60)} min · Week {weekByDay[todayDay.id]}
+          {todayDay.exercises.length} exercises · ~{Math.round(todayDay.exercises.reduce((n, e) => n + e.sets * (e.type === 'Compound' ? 135 : 120), 0) / 60)} min
         </div>
         {program.days.length > 1 && (
           <div style={s.dayChips}>
@@ -154,7 +168,9 @@ export default function HomePage() {
                 <div style={s.dayFocus}>{day.focus.split(' · ').slice(0, 2).join(' · ')}</div>
               </div>
             </div>
-            <div style={s.weekTag(isSelected)}>WK {weekByDay[day.id]}</div>
+            {lastDoneLabel(day.id) && (
+              <div style={s.weekTag(isSelected)}>{lastDoneLabel(day.id)}</div>
+            )}
           </div>
         );
       })}
