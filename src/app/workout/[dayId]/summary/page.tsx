@@ -2,6 +2,7 @@
 import { use, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
+import { logWorkoutToHealth } from '@/lib/healthkit';
 import type { SessionLog } from '@/lib/types';
 
 function calcStats(sessionLog: SessionLog, exercises: { sets: number; reps: number; weight: number }[]) {
@@ -49,15 +50,17 @@ export default function SummaryPage({ params }: { params: Promise<{ dayId: strin
     savedRef.current = true;
     const day = program.days.find(d => d.id === session.dayId)!;
     const { totalSets, totalVolume } = calcStats(session.sessionLog, day.exercises);
+    const durationMs = Date.now() - session.startedAt;
     dispatch({
       type: 'COMPLETE_SESSION',
       completedAt: Date.now(),
-      durationMs: Date.now() - session.startedAt,
+      durationMs,
       dayName: day.name,
       totalSets,
       totalVolume,
       prs: 0,
     });
+    logWorkoutToHealth(durationMs, totalVolume);
   }, []);
 
   if (!session) {
