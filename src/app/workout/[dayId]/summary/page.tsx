@@ -3,6 +3,7 @@ import { use, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { logWorkoutToHealth } from '@/lib/healthkit';
+import { Capacitor } from '@capacitor/core';
 import type { SessionLog } from '@/lib/types';
 
 function calcStats(sessionLog: SessionLog, exercises: { sets: number; reps: number; weight: number }[]) {
@@ -81,6 +82,7 @@ function SummaryView({ dayId, dayName, durationMs, totalSets, totalVolume, prs, 
   sessionLog: SessionLog; exercises: { name: string; weight: number; unit?: string }[]; router: ReturnType<typeof useRouter>;
 }) {
   const debrief = coachDebrief(dayName, sessionLog, exercises);
+  const isNative = Capacitor.isNativePlatform();
 
   const s = {
     screen: { paddingTop: 'var(--top)', paddingLeft: 16, paddingRight: 16, paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 32px)', maxWidth: 480, margin: '0 auto', minHeight: '100svh', background: '#000' },
@@ -127,6 +129,13 @@ function SummaryView({ dayId, dayName, durationMs, totalSets, totalVolume, prs, 
           <div style={s.statVal}>{prs}</div>
         </div>
       </div>
+
+      {isNative && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(255,59,48,0.07)', border: '1px solid rgba(255,59,48,0.18)', borderRadius: 12, marginBottom: 14 }}>
+          <span style={{ fontSize: 18 }}>❤️</span>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>Workout saved to <strong style={{ color: '#fff' }}>Apple Health</strong></div>
+        </div>
+      )}
 
       <div style={s.coachCard}>
         <div style={s.coachHead}>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase';
+import { Capacitor } from '@capacitor/core';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
 
@@ -18,6 +19,10 @@ export default function MePage() {
   const [bwUnit, setBwUnit] = useState<'lb' | 'kg'>('lb');
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackState, setFeedbackState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const isNative = Capacitor.isNativePlatform();
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div style={{ minHeight: '100svh', background: '#000' }} />;
 
@@ -51,6 +56,32 @@ export default function MePage() {
     await supabase.auth.signOut();
     dispatch({ type: 'SIGN_OUT' });
     router.replace('/onboarding/signin');
+  }
+
+  async function deleteAccount() {
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/delete-account', {
+        method: 'DELETE',
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDeleteError(body.error ?? 'Failed to delete account. Try again.');
+        setDeleteLoading(false);
+        return;
+      }
+      // Clear local state and sign out
+      await supabase.auth.signOut();
+      dispatch({ type: 'SIGN_OUT' });
+      router.replace('/onboarding/signin');
+    } catch {
+      setDeleteError('Something went wrong. Try again.');
+      setDeleteLoading(false);
+    }
   }
 
   const s = {
@@ -211,6 +242,22 @@ export default function MePage() {
         </div>
       </div>
 
+      {isNative && (
+        <>
+          <div style={s.section}>Apple Health</div>
+          <div style={{ ...s.row, borderColor: 'rgba(255,59,48,0.2)', background: 'rgba(255,59,48,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>❤️</span>
+              <div>
+                <div style={s.rowLabel}>Syncing to Apple Health</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Workouts logged automatically after each session</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#ff3b30', letterSpacing: '0.05em' }}>ON</div>
+          </div>
+        </>
+      )}
+
       <div style={s.section}>Program</div>
       <div style={s.row}>
         <div style={s.rowLabel}>Active programs</div>
@@ -277,6 +324,34 @@ export default function MePage() {
         </div>
       ) : (
         <button style={s.signOutBtn} onClick={() => setConfirmSignOut(true)}>Sign out</button>
+      )}
+
+      <div style={s.section}>Danger zone</div>
+      {confirmDelete ? (
+        <div style={{ ...s.confirmCard, marginBottom: 32 }}>
+          <div style={s.confirmText}>
+            <strong style={{ color: '#ff6b6b' }}>Permanently delete your account?</strong>{'\n\n'}
+            All workout history, program data, and account information will be erased immediately. This cannot be undone.
+          </div>
+          {deleteError ? <div style={{ fontSize: 12, color: '#ff6b6b', marginBottom: 10 }}>{deleteError}</div> : null}
+          <div style={s.confirmRow}>
+            <button style={s.cancelBtn} onClick={() => { setConfirmDelete(false); setDeleteError(''); }}>Cancel</button>
+            <button
+              style={{ ...s.confirmBtn, background: 'rgba(255,59,48,0.3)', borderColor: 'rgba(255,59,48,0.4)', opacity: deleteLoading ? 0.6 : 1 }}
+              onClick={deleteAccount}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? 'Deleting…' : 'Delete forever'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          style={{ width: '100%', padding: '14px 0', background: 'transparent', border: '1px solid rgba(255,59,48,0.2)', borderRadius: 14, fontSize: 14, fontWeight: 600, color: 'rgba(255,59,48,0.7)', cursor: 'pointer', marginBottom: 32 }}
+          onClick={() => setConfirmDelete(true)}
+        >
+          Delete account
+        </button>
       )}
     </div>
   );

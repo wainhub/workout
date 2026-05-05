@@ -1,8 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useStore } from '@/lib/store';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+import type { Session } from '@supabase/supabase-js';
+
+const DEEPLINK_SCHEME = 'com.kellum.workoutcoach://auth/callback';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
 
@@ -17,17 +22,118 @@ export default function SignInPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState('');
+  const isNative = Capacitor.isNativePlatform();
+
+  async function handleSession(session: Session) {
+    const supabase = createClient();
+    const u = session.user;
+    const rawProvider = u.app_metadata?.provider ?? 'email';
+    const provider = (rawProvider === 'apple' ? 'apple' : rawProvider === 'google' ? 'google' : 'email') as 'apple' | 'google' | 'email';
+    const emailVal = u.email ?? '';
+    const name = u.user_metadata?.full_name ?? u.user_metadata?.name ?? emailVal.split('@')[0] ?? 'User';
+    const user = { provider, email: emailVal, name };
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase.from('user_state') as any)
+        .select('state').eq('user_id', u.id).single();
+      if (data?.state) {
+        dispatch({ type: 'RESTORE_STATE', savedState: { ...data.state, user } });
+        router.replace('/home');
+        return;
+      }
+    } catch {}
+
+    const saved = localStorage.getItem(`wain-workout-user-${emailVal}`);
+    if (saved) {
+      try {
+        dispatch({ type: 'RESTORE_STATE', savedState: { ...JSON.parse(saved), user } });
+        router.replace('/home');
+        return;
+      } catch {}
+    }
+
+    dispatch({ type: 'SIGN_IN', user });
+    router.replace('/onboarding/profile');
+  }
+
+  // Listen for OAuth deep-link redirect on native (com.kellum.workoutcoach://auth/callback#token...)
+  useEffect(() => {
+    if (!isNative) return;
+
+    let appPlugin: typeof import('@capacitor/app').App | null = null;
+    let cleanup: (() => void) | null = null;
+
+    import('@capacitor/app').then(({ App }) => {
+      appPlugin = App;
+      App.addListener('appUrlOpen', async ({ url }) => {
+        if (!url.startsWith('com.kellum.workoutcoach://auth/callback')) return;
+        try {
+          await Browser.close();
+        } catch {}
+        setGoogleLoading(false);
+        setAppleLoading(false);
+
+        const fragment = url.split('#')[1] ?? '';
+        const params = new URLSearchParams(fragment);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (!accessToken || !refreshToken) {
+          setError('Sign-in failed. Please try again.');
+          return;
+        }
+        const supabase = createClient();
+        const { data: { session }, error: sessErr } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (sessErr || !session) {
+          setError(sessErr?.message ?? 'Sign-in failed. Please try again.');
+          return;
+        }
+        await handleSession(session);
+      }).then(handle => {
+        cleanup = () => handle.remove();
+      });
+    }).catch(() => {});
+
+    return () => { cleanup?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNative]);
+
+  async function signInWithOAuthNative(provider: 'google' | 'apple') {
+    const supabase = createClient();
+    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: DEEPLINK_SCHEME,
+        skipBrowserRedirect: true,
+      },
+    });
+    if (oauthError || !data.url) {
+      setError(oauthError?.message ?? 'Something went wrong. Try again.');
+      setGoogleLoading(false);
+      setAppleLoading(false);
+      return;
+    }
+    await Browser.open({ url: data.url });
+  }
 
   async function signInWithGoogle() {
     setGoogleLoading(true);
     setError('');
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      if (error) { setError(error.message); setGoogleLoading(false); }
+      if (isNative) {
+        await signInWithOAuthNative('google');
+        // loading cleared by appUrlOpen listener
+      } else {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${window.location.origin}/auth/callback` },
+        });
+        if (error) { setError(error.message); setGoogleLoading(false); }
+      }
     } catch {
       setError('Something went wrong. Try again.');
       setGoogleLoading(false);
@@ -38,12 +144,17 @@ export default function SignInPage() {
     setAppleLoading(true);
     setError('');
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      if (error) { setError(error.message); setAppleLoading(false); }
+      if (isNative) {
+        await signInWithOAuthNative('apple');
+        // loading cleared by appUrlOpen listener
+      } else {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'apple',
+          options: { redirectTo: `${window.location.origin}/auth/callback` },
+        });
+        if (error) { setError(error.message); setAppleLoading(false); }
+      }
     } catch {
       setError('Something went wrong. Try again.');
       setAppleLoading(false);
