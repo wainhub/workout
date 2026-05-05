@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
+import { Capacitor } from '@capacitor/core';
+import { requestHealthAuthorization } from '@/lib/healthkit';
 import type { SessionLog } from '@/lib/types';
 
 const DAY_LABELS: Record<number, string> = { 1: 'Tue', 2: 'Wed', 3: 'Fri', 4: 'Sat' };
@@ -25,7 +27,16 @@ export default function HomePage() {
   const program = useActiveProgram();
   const [mounted, setMounted] = useState(false);
   const [selectedDayId, setSelectedDayId] = useState<number | null>(null);
-  useEffect(() => setMounted(true), []);
+  const isNative = Capacitor.isNativePlatform();
+
+  useEffect(() => {
+    setMounted(true);
+    // Request HealthKit authorization on first home screen load (native only)
+    if (Capacitor.isNativePlatform()) {
+      requestHealthAuthorization();
+    }
+  }, []);
+
   if (!mounted) return <div style={{ minHeight: '100dvh', background: '#000' }} />;
   const { weekByDay } = state;
 
@@ -151,6 +162,13 @@ export default function HomePage() {
           Start workout
         </button>
       </div>
+
+      {isNative && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 13px', background: 'rgba(255,59,48,0.07)', border: '1px solid rgba(255,59,48,0.18)', borderRadius: 12 }}>
+          <span style={{ fontSize: 16 }}>❤️</span>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>Syncing completed workouts to <strong style={{ color: '#fff' }}>Apple Health</strong></div>
+        </div>
+      )}
 
       <div style={s.sectionHead}>This week</div>
       {program.days.map(day => {

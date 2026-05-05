@@ -7,6 +7,14 @@ interface HealthKitPlugin {
 
 const HealthKit = registerPlugin<HealthKitPlugin>('HealthKit');
 
+export async function requestHealthAuthorization(): Promise<void> {
+  try {
+    await HealthKit.requestAuthorization();
+  } catch {
+    // Silently fail on web/non-native
+  }
+}
+
 export async function logWorkoutToHealth(durationMs: number, totalVolume: number): Promise<void> {
   try {
     await HealthKit.requestAuthorization();
