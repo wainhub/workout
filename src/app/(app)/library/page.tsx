@@ -4,7 +4,138 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import type { Program } from '@/lib/types';
 
-const BLANK = { name: '', type: 'Compound' as 'Compound' | 'Isolation', sets: 3, reps: 10, weight: 0, unit: '' };
+const BLANK = { name: '', type: 'Compound' as 'Compound' | 'Isolation', sets: 3, reps: 10, weight: 0, unit: '', videoUrl: '' };
+
+// ─── Module-level styles (stable references) ────────────────────────────────
+const INPUT_STYLE = {
+  width: '100%', height: 40, background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+  color: '#fff', fontSize: 14, padding: '0 10px', outline: 'none',
+  boxSizing: 'border-box' as const,
+};
+const LABEL_STYLE = {
+  fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+  color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' as const,
+  marginBottom: 5, display: 'block', marginTop: 10,
+};
+
+// ─── ExForm — defined at module level so React never remounts it ─────────────
+// (Defining it inside LibraryPageInner would create a new function reference
+//  on every render, causing React to unmount/remount and dismiss the keyboard.)
+interface ExFormProps {
+  p: Program;
+  form: typeof BLANK;
+  setForm: React.Dispatch<React.SetStateAction<typeof BLANK>>;
+  activeForm: { programId: string; dayId: number; exIdx: number | null } | null;
+  saveEx: (p: Program) => void;
+}
+
+function ExForm({ p, form, setForm, activeForm, saveEx }: ExFormProps) {
+  const [mwThumb, setMwThumb] = useState('');
+  const [mwName, setMwName] = useState('');
+  const [mwSearching, setMwSearching] = useState(false);
+
+  // Debounced MuscleWiki lookup — fires 700 ms after user stops typing
+  useEffect(() => {
+    const trimmed = form.name.trim();
+    if (trimmed.length < 3) { setMwThumb(''); setMwName(''); return; }
+    setMwSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/musclewiki?name=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        const videos = data.videos ?? [];
+        if (videos.length > 0 && videos[0].og_image) {
+          setMwThumb(videos[0].og_image);
+          // Save the video URL so it gets stored on the exercise
+          setForm(f => ({ ...f, videoUrl: videos[0].url ?? '' }));
+          setMwName(trimmed);
+        } else {
+          setMwThumb('');
+          setMwName('');
+          setForm(f => ({ ...f, videoUrl: '' }));
+        }
+      } catch {
+        setMwThumb('');
+        setMwName('');
+      } finally {
+        setMwSearching(false);
+      }
+    }, 700);
+    return () => { clearTimeout(timer); setMwSearching(false); };
+  }, [form.name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, marginTop: 4, marginBottom: 4 }}>
+
+      <label style={{ ...LABEL_STYLE, marginTop: 0 }}>Exercise name</label>
+      <input
+        style={INPUT_STYLE}
+        placeholder="e.g. Incline DB Press"
+        value={form.name}
+        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
+      />
+
+      {/* MuscleWiki video preview */}
+      {mwSearching && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+          <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(161,240,194,0.5)', borderTopColor: '#a1f0c2', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          Searching MuscleWiki…
+        </div>
+      )}
+      {!mwSearching && mwThumb && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, padding: '8px 10px', background: 'rgba(161,240,194,0.05)', border: '1px solid rgba(161,240,194,0.2)', borderRadius: 10 }}>
+          <img
+            src={mwThumb}
+            alt="Exercise demo"
+            style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', background: '#111', flexShrink: 0 }}
+          />
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: '#a1f0c2', textTransform: 'uppercase' as const, marginBottom: 2 }}>✓ Video found</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>{mwName}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>Demo video will appear during workout</div>
+          </div>
+        </div>
+      )}
+      {!mwSearching && !mwThumb && form.name.trim().length >= 3 && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
+          No demo video found — exercise will be saved without one
+        </div>
+      )}
+
+      <label style={LABEL_STYLE}>Type</label>
+      <div style={{ display: 'flex', gap: 5, background: 'rgba(255,255,255,0.05)', padding: 3, borderRadius: 8 }}>
+        {(['Compound', 'Isolation'] as const).map(t => (
+          <button key={t} onClick={() => setForm(f => ({ ...f, type: t }))}
+            style={{ flex: 1, height: 32, background: form.type === t ? '#a1f0c2' : 'transparent', color: form.type === t ? '#062b18' : 'rgba(255,255,255,0.6)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <label style={LABEL_STYLE}>Sets · Reps · Weight (lb)</label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        <input style={INPUT_STYLE} type="number" placeholder="Sets"  value={form.sets   || ''} onChange={e => setForm(f => ({ ...f, sets:   Number(e.target.value) }))} />
+        <input style={INPUT_STYLE} type="number" placeholder="Reps"  value={form.reps   || ''} onChange={e => setForm(f => ({ ...f, reps:   Number(e.target.value) }))} />
+        <input style={INPUT_STYLE} type="number" placeholder="lb"    value={form.weight || ''} onChange={e => setForm(f => ({ ...f, weight: Number(e.target.value) }))} />
+      </div>
+
+      <label style={LABEL_STYLE}>Unit label (optional)</label>
+      <input style={INPUT_STYLE} placeholder="e.g. lb ea." value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
+
+      <button
+        onClick={() => saveEx(p)}
+        style={{ width: '100%', padding: '10px 0', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 14, fontWeight: 700, color: '#062b18', cursor: 'pointer', marginTop: 12 }}>
+        {activeForm?.exIdx !== null ? 'Save changes' : 'Add exercise'}
+      </button>
+    </div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
 
 function LibraryPageInner() {
   const router = useRouter();
@@ -40,7 +171,7 @@ function LibraryPageInner() {
   function openEditEx(programId: string, dayId: number, exIdx: number, p: Program) {
     if (activeForm?.programId === programId && activeForm.dayId === dayId && activeForm.exIdx === exIdx) { setActiveForm(null); return; }
     const ex = p.days.find(d => d.id === dayId)!.exercises[exIdx];
-    setForm({ name: ex.name, type: ex.type, sets: ex.sets, reps: ex.reps, weight: ex.weight, unit: ex.unit ?? '' });
+    setForm({ name: ex.name, type: ex.type, sets: ex.sets, reps: ex.reps, weight: ex.weight, unit: ex.unit ?? '', videoUrl: ex.videoUrl ?? '' });
     setActiveForm({ programId, dayId, exIdx });
   }
 
@@ -55,6 +186,7 @@ function LibraryPageInner() {
     const exercise = {
       name: form.name.trim(), type: form.type, sets: form.sets, reps: form.reps,
       weight: form.weight, unit: form.unit.trim() || undefined,
+      videoUrl: form.videoUrl.trim() || undefined,
       cue: activeForm.exIdx !== null
         ? p.days.find(d => d.id === activeForm.dayId)!.exercises[activeForm.exIdx].cue
         : 'Control the movement, focus on form and full range of motion.',
@@ -85,40 +217,7 @@ function LibraryPageInner() {
     titleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
     title:    { fontSize: 28, fontWeight: 700, letterSpacing: '-0.025em' },
     newBtn:   { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 13, fontWeight: 700, color: '#062b18', cursor: 'pointer' },
-    formInput: { width: '100%', height: 40, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#fff', fontSize: 14, padding: '0 10px', outline: 'none', boxSizing: 'border-box' } as const,
-    formLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' as const, marginBottom: 5, display: 'block', marginTop: 10 },
   };
-
-  function ExForm({ p }: { p: Program }) {
-    return (
-      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, marginTop: 4, marginBottom: 4 }}>
-        <label style={{ ...s.formLabel, marginTop: 0 }}>Exercise name</label>
-        <input style={s.formInput} placeholder="e.g. Incline DB Press" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-        <label style={s.formLabel}>Type</label>
-        <div style={{ display: 'flex', gap: 5, background: 'rgba(255,255,255,0.05)', padding: 3, borderRadius: 8 }}>
-          {(['Compound', 'Isolation'] as const).map(t => (
-            <button key={t} onClick={() => setForm(f => ({ ...f, type: t }))}
-              style={{ flex: 1, height: 32, background: form.type === t ? '#a1f0c2' : 'transparent', color: form.type === t ? '#062b18' : 'rgba(255,255,255,0.6)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              {t}
-            </button>
-          ))}
-        </div>
-        <label style={s.formLabel}>Sets · Reps · Weight (lb)</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-          <input style={s.formInput} type="number" placeholder="Sets"  value={form.sets   || ''} onChange={e => setForm(f => ({ ...f, sets:   Number(e.target.value) }))} />
-          <input style={s.formInput} type="number" placeholder="Reps"  value={form.reps   || ''} onChange={e => setForm(f => ({ ...f, reps:   Number(e.target.value) }))} />
-          <input style={s.formInput} type="number" placeholder="lb"    value={form.weight || ''} onChange={e => setForm(f => ({ ...f, weight: Number(e.target.value) }))} />
-        </div>
-        <label style={s.formLabel}>Unit label (optional)</label>
-        <input style={s.formInput} placeholder="e.g. lb ea." value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
-        <button
-          onClick={() => saveEx(p)}
-          style={{ width: '100%', padding: '10px 0', background: '#a1f0c2', border: 'none', borderRadius: 999, fontSize: 14, fontWeight: 700, color: '#062b18', cursor: 'pointer', marginTop: 12 }}>
-          {activeForm?.exIdx !== null ? 'Save changes' : 'Add exercise'}
-        </button>
-      </div>
-    );
-  }
 
   function ProgramCard({ p }: { p: Program }) {
     const isActive = p.id === state.activeProgramId;
@@ -165,7 +264,6 @@ function LibraryPageInner() {
                 Switch →
               </button>
             )}
-            {/* Trash icon — visible on all cards, requires confirmation */}
             {state.programs.length > 1 && (
               confirmDelete === p.id ? (
                 <div style={{ display: 'flex', gap: 5 }}>
@@ -201,7 +299,7 @@ function LibraryPageInner() {
               {isEditingThisName ? (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
-                    style={{ ...s.formInput, fontSize: 16, fontWeight: 700, flex: 1 }}
+                    style={{ ...INPUT_STYLE, fontSize: 16, fontWeight: 700, flex: 1 }}
                     value={nameValue} autoFocus
                     onChange={e => setNameValue(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { dispatch({ type: 'RENAME_PROGRAM', programId: p.id, name: nameValue.trim() || p.name }); setEditingName(null); } }}
@@ -270,7 +368,9 @@ function LibraryPageInner() {
                           </div>
                       }
                     </div>
-                    {isEditingThisDays && activeForm?.programId === p.id && activeForm.dayId === day.id && activeForm.exIdx === i && <ExForm p={p} />}
+                    {isEditingThisDays && activeForm?.programId === p.id && activeForm.dayId === day.id && activeForm.exIdx === i && (
+                      <ExForm p={p} form={form} setForm={setForm} activeForm={activeForm} saveEx={saveEx} />
+                    )}
                   </div>
                 ))}
 
@@ -280,7 +380,9 @@ function LibraryPageInner() {
                       style={{ width: '100%', padding: '9px 0', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 10, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', marginTop: 8 }}>
                       {activeForm?.programId === p.id && activeForm.dayId === day.id && activeForm.exIdx === null ? '− Cancel' : '+ Add exercise'}
                     </button>
-                    {activeForm?.programId === p.id && activeForm.dayId === day.id && activeForm.exIdx === null && <ExForm p={p} />}
+                    {activeForm?.programId === p.id && activeForm.dayId === day.id && activeForm.exIdx === null && (
+                      <ExForm p={p} form={form} setForm={setForm} activeForm={activeForm} saveEx={saveEx} />
+                    )}
                   </>
                 )}
               </div>
