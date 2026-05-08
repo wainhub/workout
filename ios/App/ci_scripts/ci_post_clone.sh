@@ -26,5 +26,5 @@ echo "▶ npm ci complete."
 # Regenerate Capacitor-generated files (capacitor.config.json, config.xml, public/)
 # inside ios/App/App/ — these are gitignored but required by the Xcode project.
 echo "▶ Running cap sync ios..."
-npx cap sync ios --no-build
+npx cap sync ios
 echo "▶ cap sync complete."
