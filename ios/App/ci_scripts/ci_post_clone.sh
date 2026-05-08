@@ -16,8 +16,8 @@ fi
 
 echo "  node $(node --version) / npm $(npm --version)"
 
-# Run from the repository root (CI_WORKSPACE is set by Xcode Cloud)
-cd "$CI_WORKSPACE"
+# CI_PRIMARY_REPOSITORY_PATH is the repo root (CI_WORKSPACE is the .xcodeproj dir)
+cd "$CI_PRIMARY_REPOSITORY_PATH"
 npm ci
 
 echo "▶ npm ci complete."
