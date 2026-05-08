@@ -7,11 +7,12 @@ set -e
 
 echo "▶ Installing Node.js dependencies..."
 
-# Xcode Cloud agents ship with Node via Homebrew; fall back to installing it if missing.
-if ! command -v node &>/dev/null; then
-  echo "  Node not found — installing via Homebrew..."
-  brew install node@20
-  export PATH="$(brew --prefix node@20)/bin:$PATH"
+# Capacitor CLI requires Node >= 22. Install via Homebrew if missing or too old.
+NODE_MAJOR=$(node --version 2>/dev/null | sed 's/v\([0-9]*\).*/\1/')
+if [ -z "$NODE_MAJOR" ] || [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "  Node ${NODE_MAJOR:-not found} — installing node@22 via Homebrew..."
+  brew install node@22
+  export PATH="$(brew --prefix node@22)/bin:$PATH"
 fi
 
 echo "  node $(node --version) / npm $(npm --version)"
