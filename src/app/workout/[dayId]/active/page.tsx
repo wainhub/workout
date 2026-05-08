@@ -7,6 +7,8 @@ import { getExerciseImageUrl, getVideoWatchUrl } from '@/lib/videos';
 import { apiUrl } from '@/lib/api';
 import type { SetEntry } from '@/lib/types';
 
+const ADD_EX_BLANK = { name: '', type: 'Compound' as 'Compound' | 'Isolation', sets: 3, reps: 10, weight: 0, unit: '', videoUrl: '' };
+
 export default function ActivePage({ params }: { params: Promise<{ dayId: string }> }) {
   const { dayId } = use(params);
   const router = useRouter();
@@ -26,6 +28,12 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const [editingSet, setEditingSet] = useState<number | null>(null);
   const [tempWeight, setTempWeight] = useState(0);
   const [tempReps, setTempReps] = useState(0);
+
+  // Add-exercise panel
+  const [addExOpen, setAddExOpen] = useState(false);
+  const [addExForm, setAddExForm] = useState(ADD_EX_BLANK);
+  const [addExMwThumb, setAddExMwThumb] = useState('');
+  const [addExMwSearching, setAddExMwSearching] = useState(false);
 
   // Rest timer
   const [restSecs, setRestSecs] = useState(0);
@@ -132,6 +140,33 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.exIdx]);
 
+  // MuscleWiki search for the add-exercise panel (debounced)
+  useEffect(() => {
+    const trimmed = addExForm.name.trim();
+    if (trimmed.length < 3) { setAddExMwThumb(''); return; }
+    setAddExMwSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(apiUrl(`/api/musclewiki?name=${encodeURIComponent(trimmed)}`));
+        const data = await res.json();
+        const videos: { url: string; og_image: string }[] = data.videos ?? [];
+        if (videos.length > 0 && videos[0].og_image) {
+          setAddExMwThumb(videos[0].og_image);
+          setAddExForm(f => ({ ...f, videoUrl: videos[0].url ?? '' }));
+        } else {
+          setAddExMwThumb('');
+          setAddExForm(f => ({ ...f, videoUrl: '' }));
+        }
+      } catch {
+        setAddExMwThumb('');
+      } finally {
+        setAddExMwSearching(false);
+      }
+    }, 700);
+    return () => { clearTimeout(timer); setAddExMwSearching(false); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addExForm.name]);
+
   if (!session || session.dayId !== Number(dayId)) {
     router.replace(`/workout/${dayId}`);
     return null;
@@ -226,6 +261,42 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   function adjustRest(delta: number) {
     setRestSecs(s => Math.max(5, s + delta));
     setRestTarget(t => Math.max(5, t + delta));
+  }
+
+  // ── Add a bonus exercise mid-workout ─────────────────────────────
+  function addAndStartExercise() {
+    if (!addExForm.name.trim() || !session) return;
+    const newExIdx = day.exercises.length; // will be appended at this index
+    const newEx = {
+      name: addExForm.name.trim(),
+      type: addExForm.type,
+      sets: addExForm.sets,
+      reps: addExForm.reps,
+      weight: addExForm.weight,
+      unit: addExForm.unit.trim() || undefined,
+      videoUrl: addExForm.videoUrl || undefined,
+      cue: 'Control the movement, focus on form and full range of motion.',
+    };
+    // 1. Save permanently to the program
+    dispatch({ type: 'ADD_EXERCISE', programId: program.id, dayId: session.dayId, exercise: newEx });
+    // 2. Seed session log entries for the new exercise
+    const newSets: SetEntry[] = Array.from({ length: newEx.sets }, (_, j) => ({
+      weight: newEx.weight,
+      reps: newEx.reps,
+      status: (j === 0 ? 'active' : 'upcoming') as SetEntry['status'],
+    }));
+    dispatch({ type: 'UPDATE_SETS', exIdx: newExIdx, sets: newSets });
+    // 3. Advance session to the new exercise
+    dispatch({ type: 'ADVANCE_EXERCISE', exIdx: newExIdx });
+    // 4. Cancel any running rest timer
+    if (restRef.current) clearInterval(restRef.current);
+    setRestActive(false);
+    setRestSecs(0);
+    restEndCbRef.current = null;
+    // 5. Reset form
+    setAddExOpen(false);
+    setAddExForm(ADD_EX_BLANK);
+    setAddExMwThumb('');
   }
 
   // ── Set operations (regular mode) ─────────────────────────────────
@@ -703,6 +774,107 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
       {!isTimeBased && !allDone && editingSet === null && !restActive && (
         <div style={{ marginTop: 14, textAlign: 'center' as const, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
           Tap a set to log it · rest starts automatically
+        </div>
+      )}
+
+      {/* ── Add exercise panel (last exercise, all sets done) ──── */}
+      {!isTimeBased && isLast && allDone && (
+        <div style={{ marginTop: 16, paddingBottom: 8 }}>
+          {!addExOpen ? (
+            <button
+              onClick={() => setAddExOpen(true)}
+              style={{
+                width: '100%', padding: '11px 0',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px dashed rgba(255,255,255,0.18)',
+                borderRadius: 14, fontSize: 13, fontWeight: 600,
+                color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+              }}
+            >
+              + Add bonus exercise
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 16 }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Add exercise</div>
+                <button
+                  onClick={() => { setAddExOpen(false); setAddExForm(ADD_EX_BLANK); setAddExMwThumb(''); }}
+                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 8, fontSize: 14, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
+              </div>
+
+              {/* Exercise name */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' as const, marginBottom: 5 }}>Exercise name</div>
+              <input
+                style={{ width: '100%', height: 40, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#fff', fontSize: 14, padding: '0 10px', outline: 'none', boxSizing: 'border-box' as const }}
+                placeholder="e.g. Cable Curl"
+                value={addExForm.name}
+                onChange={e => setAddExForm(f => ({ ...f, name: e.target.value }))}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="words"
+              />
+
+              {/* MuscleWiki preview */}
+              {addExMwSearching && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 7 }}>Searching MuscleWiki…</div>
+              )}
+              {!addExMwSearching && addExMwThumb && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, padding: '7px 10px', background: 'rgba(161,240,194,0.05)', border: '1px solid rgba(161,240,194,0.18)', borderRadius: 10 }}>
+                  <img src={addExMwThumb} alt="" style={{ width: 44, height: 44, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: '#a1f0c2', textTransform: 'uppercase' as const, marginBottom: 1 }}>✓ Video found</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Demo video will appear during the set</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Type toggle */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' as const, marginBottom: 5, marginTop: 10 }}>Type</div>
+              <div style={{ display: 'flex', gap: 5, background: 'rgba(255,255,255,0.05)', padding: 3, borderRadius: 8 }}>
+                {(['Compound', 'Isolation'] as const).map(t => (
+                  <button key={t} onClick={() => setAddExForm(f => ({ ...f, type: t }))}
+                    style={{ flex: 1, height: 32, background: addExForm.type === t ? '#a1f0c2' : 'transparent', color: addExForm.type === t ? '#062b18' : 'rgba(255,255,255,0.6)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sets / Reps / Weight */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' as const, marginBottom: 5, marginTop: 10 }}>Sets · Reps · Weight (lb)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                {(['sets', 'reps', 'weight'] as const).map(field => (
+                  <input key={field} type="number" placeholder={field === 'weight' ? 'lb' : field.charAt(0).toUpperCase() + field.slice(1)}
+                    style={{ width: '100%', height: 40, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#fff', fontSize: 14, padding: '0 10px', outline: 'none', boxSizing: 'border-box' as const }}
+                    value={addExForm[field] || ''}
+                    onChange={e => setAddExForm(f => ({ ...f, [field]: Number(e.target.value) }))}
+                  />
+                ))}
+              </div>
+
+              {/* Save note */}
+              <div style={{ fontSize: 11, color: 'rgba(161,240,194,0.6)', marginTop: 10 }}>
+                ✓ Saves permanently to <strong style={{ color: 'rgba(161,240,194,0.9)' }}>{day.name}</strong> for future workouts
+              </div>
+
+              {/* Submit */}
+              <button
+                onClick={addAndStartExercise}
+                disabled={!addExForm.name.trim()}
+                style={{
+                  width: '100%', padding: '12px 0', marginTop: 12,
+                  background: addExForm.name.trim() ? '#a1f0c2' : 'rgba(255,255,255,0.1)',
+                  border: 'none', borderRadius: 12,
+                  fontSize: 14, fontWeight: 700,
+                  color: addExForm.name.trim() ? '#062b18' : 'rgba(255,255,255,0.3)',
+                  cursor: addExForm.name.trim() ? 'pointer' : 'default',
+                }}
+              >
+                Add &amp; start now →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
