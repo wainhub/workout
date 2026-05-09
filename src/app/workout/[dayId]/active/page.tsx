@@ -784,14 +784,15 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
             <button
               onClick={() => setAddExOpen(true)}
               style={{
-                width: '100%', padding: '11px 0',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px dashed rgba(255,255,255,0.18)',
-                borderRadius: 14, fontSize: 13, fontWeight: 600,
-                color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+                width: '100%', padding: '14px 0',
+                background: 'rgba(161,240,194,0.12)',
+                border: '1.5px solid rgba(161,240,194,0.5)',
+                borderRadius: 14, fontSize: 15, fontWeight: 700,
+                color: '#a1f0c2', cursor: 'pointer',
+                letterSpacing: '0.01em',
               }}
             >
-              + Add bonus exercise
+              + Add Exercise
             </button>
           ) : (
             <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 16 }}>
