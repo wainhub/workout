@@ -60,7 +60,8 @@ function BodyweightPicker({ onPick, initialLb }: { onPick: (bw: number, unit: 'l
   const [value, setValue] = useState(initialLb ? String(initialLb) : '');
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
   const num = Number(value);
-  const valid = num > 60 && num < 500;
+  const numLb = unit === 'kg' ? num * 2.205 : num;
+  const valid = num > 0 && numLb > 50 && numLb < 700;
 
   return (
     <div style={{ padding: '14px 16px', paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 60px)', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#0a0a0a', flexShrink: 0 }}>
