@@ -188,7 +188,7 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
   const thumbUrl = getExerciseImageUrl(ex.name);
   const watchUrl = getVideoWatchUrl(ex.name);
   const isTimeBased = !!(ex.unit?.includes('sec') || ex.unit?.includes('min'));
-  const isWeighted = ex.weight > 0;
+  const isWeighted = !isTimeBased; // always show weight stepper for non-timed exercises
   const repsLabel = isTimeBased ? (ex.unit?.includes('min') ? 'MINUTES' : 'SECONDS') : 'REPS';
   const workDurSecs = ex.unit?.includes('min') ? Number(ex.reps) * 60 : Number(ex.reps);
 
@@ -705,8 +705,8 @@ export default function ActivePage({ params }: { params: Promise<{ dayId: string
                       {isWeighted && (
                         <>
                           <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 6 }}>
-                            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>LOAD (lb)</div>
-                            <Stepper value={tempWeight} step={5} onChange={setTempWeight} />
+                            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>{tempWeight === 0 ? 'BODYWEIGHT' : 'LOAD (lb)'}</div>
+                            <Stepper value={tempWeight} step={tempWeight === 0 ? 5 : 5} onChange={setTempWeight} />
                           </div>
                           <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.1)' }} />
                         </>
