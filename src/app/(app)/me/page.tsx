@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase';
 import { Capacitor } from '@capacitor/core';
+import { requestHealthAuthorization } from '@/lib/healthkit';
 
 const AI_GRADIENT = 'linear-gradient(135deg, #ff7a59 0%, #e85d75 50%, #6ec3e8 100%)';
 
@@ -245,15 +246,25 @@ export default function MePage() {
       {isNative && (
         <>
           <div style={s.section}>Apple Health</div>
-          <div style={{ ...s.row, borderColor: 'rgba(255,59,48,0.2)', background: 'rgba(255,59,48,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 20 }}>❤️</span>
-              <div>
-                <div style={s.rowLabel}>Syncing to Apple Health</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Workouts logged automatically after each session</div>
+          <div style={{ background: 'rgba(255,59,48,0.06)', border: '1px solid rgba(255,59,48,0.2)', borderRadius: 14, padding: 16, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <span style={{ fontSize: 28 }}>❤️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Apple Health Integration</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 1.4 }}>
+                  Workout Coach saves each completed workout to Apple Health — including duration, activity type, and estimated calories burned.
+                </div>
               </div>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#ff3b30', letterSpacing: '0.05em' }}>ON</div>
+            <button
+              onClick={async () => { await requestHealthAuthorization(); }}
+              style={{ width: '100%', padding: '11px 0', background: '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+            >
+              Enable Apple Health Access
+            </button>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8 }}>
+              You can change this anytime in iOS Settings → Workout Coach
+            </div>
           </div>
         </>
       )}
