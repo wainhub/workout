@@ -24,6 +24,8 @@ export default function MePage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [healthAuthorized, setHealthAuthorized] = useState(false);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState('');
   const isNative = Capacitor.isNativePlatform();
   useEffect(() => {
     setMounted(true);
@@ -266,21 +268,31 @@ export default function MePage() {
               </div>
             ) : (
               <button
+                disabled={healthLoading}
                 onClick={async () => {
-                  const granted = await requestHealthAuthorization();
+                  setHealthLoading(true);
+                  setHealthError('');
+                  const { granted, error } = await requestHealthAuthorization();
+                  setHealthLoading(false);
                   if (granted) {
                     localStorage.setItem('healthkit-authorized', 'true');
                     setHealthAuthorized(true);
+                  } else if (error) {
+                    setHealthError(error);
                   }
                 }}
-                style={{ width: '100%', padding: '11px 0', background: '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '11px 0', background: healthLoading ? 'rgba(255,59,48,0.5)' : '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: healthLoading ? 'default' : 'pointer' }}
               >
-                Enable Apple Health Access
+                {healthLoading ? 'Connecting…' : 'Enable Apple Health Access'}
               </button>
             )}
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8 }}>
-              You can change this anytime in iOS Settings → Workout Coach
-            </div>
+            {healthError ? (
+              <div style={{ fontSize: 12, color: '#ff6b6b', textAlign: 'center', marginTop: 8 }}>{healthError}</div>
+            ) : (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8 }}>
+                You can change this anytime in iOS Settings → Workout Coach
+              </div>
+            )}
           </div>
         </>
       )}

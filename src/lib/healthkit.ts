@@ -7,13 +7,13 @@ interface HealthKitPlugin {
 
 const HealthKit = registerPlugin<HealthKitPlugin>('HealthKit');
 
-export async function requestHealthAuthorization(): Promise<boolean> {
+export async function requestHealthAuthorization(): Promise<{ granted: boolean; error?: string }> {
   try {
     const result = await HealthKit.requestAuthorization();
-    return result.authorized;
-  } catch {
-    // Silently fail on web/non-native
-    return false;
+    return { granted: result.authorized };
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e.message : String(e);
+    return { granted: false, error };
   }
 }
 
