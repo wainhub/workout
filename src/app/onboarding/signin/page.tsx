@@ -21,6 +21,7 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState('');
   const isNative = Capacitor.isNativePlatform();
 
@@ -158,6 +159,27 @@ export default function SignInPage() {
     } catch {
       setError('Something went wrong. Try again.');
       setAppleLoading(false);
+    }
+  }
+
+  async function signInAsDemo() {
+    setDemoLoading(true);
+    setError('');
+    try {
+      const supabase = createClient();
+      const { data: { session }, error } = await supabase.auth.signInWithPassword({
+        email: 'demo@workoutcoach.app',
+        password: 'DemoWorkout2024!',
+      });
+      if (error || !session) {
+        setError(error?.message ?? 'Demo sign-in failed. Try again.');
+        setDemoLoading(false);
+        return;
+      }
+      await handleSession(session);
+    } catch {
+      setError('Demo sign-in failed. Try again.');
+      setDemoLoading(false);
     }
   }
 
@@ -391,6 +413,13 @@ export default function SignInPage() {
       <div style={s.fine}>By continuing you agree to our Terms of Service and Privacy Policy.</div>
 
       <div style={{ marginTop: 28, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 24, width: '100%', maxWidth: 320 }}>
+        <button
+          onClick={signInAsDemo}
+          disabled={demoLoading}
+          style={{ width: '100%', padding: '14px 0', background: 'rgba(161,240,194,0.1)', border: '1px solid rgba(161,240,194,0.3)', borderRadius: 12, fontSize: 15, fontWeight: 700, color: '#a1f0c2', cursor: demoLoading ? 'default' : 'pointer', marginBottom: 10 }}
+        >
+          {demoLoading ? 'Opening Demo…' : '▶ Try Demo'}
+        </button>
         <button
           onClick={() => {
             dispatch({ type: 'SIGN_IN', user: { provider: 'guest', email: '', name: 'You' } });
