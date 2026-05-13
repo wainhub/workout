@@ -257,7 +257,12 @@ export default function MePage() {
               </div>
             </div>
             <button
-              onClick={async () => { await requestHealthAuthorization(); }}
+              onClick={async () => {
+                const btn = document.activeElement as HTMLButtonElement | null;
+                if (btn) btn.textContent = 'Opening Health…';
+                await requestHealthAuthorization();
+                if (btn) btn.textContent = 'Enable Apple Health Access';
+              }}
               style={{ width: '100%', padding: '11px 0', background: '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
             >
               Enable Apple Health Access
