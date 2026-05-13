@@ -31,10 +31,9 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true);
-    // Request HealthKit authorization on first home screen load (native only)
-    if (Capacitor.isNativePlatform()) {
-      requestHealthAuthorization();
-    }
+    // HealthKit authorization is requested explicitly from the Me tab button,
+    // not auto-triggered here — otherwise the system dialog fires before the
+    // user has seen any explanation, and the Me tab button appears broken.
   }, []);
 
   if (!mounted) return <div style={{ minHeight: '100dvh', background: '#000' }} />;

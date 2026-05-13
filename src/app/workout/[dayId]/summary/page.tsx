@@ -1,9 +1,8 @@
 'use client';
-import { use, useEffect, useRef } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, useActiveProgram } from '@/lib/store';
 import { logWorkoutToHealth } from '@/lib/healthkit';
-import { Capacitor } from '@capacitor/core';
 import type { SessionLog } from '@/lib/types';
 
 function calcStats(sessionLog: SessionLog, exercises: { sets: number; reps: number; weight: number }[]) {
@@ -45,6 +44,7 @@ export default function SummaryPage({ params }: { params: Promise<{ dayId: strin
   const program = useActiveProgram();
   const session = state.activeSession;
   const savedRef = useRef(false);
+  const [healthSaved, setHealthSaved] = useState(false);
 
   useEffect(() => {
     if (!session || savedRef.current) return;
@@ -61,28 +61,30 @@ export default function SummaryPage({ params }: { params: Promise<{ dayId: strin
       totalVolume,
       prs: 0,
     });
-    logWorkoutToHealth(durationMs, totalVolume);
+    logWorkoutToHealth(durationMs, totalVolume).then(saved => {
+      if (saved) setHealthSaved(true);
+    });
   }, []);
 
   if (!session) {
     const last = state.history[0];
     if (!last) { router.replace('/home'); return null; }
     const day = program.days.find(d => d.id === last.dayId)!;
-    return <SummaryView dayId={dayId} dayName={last.dayName} durationMs={last.durationMs} totalSets={last.totalSets} totalVolume={last.totalVolume} prs={last.prs} sessionLog={last.sessionLog} exercises={day?.exercises ?? []} router={router} />;
+    return <SummaryView dayId={dayId} dayName={last.dayName} durationMs={last.durationMs} totalSets={last.totalSets} totalVolume={last.totalVolume} prs={last.prs} sessionLog={last.sessionLog} exercises={day?.exercises ?? []} router={router} healthSaved={false} />;
   }
 
   const day = program.days.find(d => d.id === session.dayId)!;
   const { totalSets, totalVolume } = calcStats(session.sessionLog, day.exercises);
 
-  return <SummaryView dayId={dayId} dayName={day.name} durationMs={Date.now() - session.startedAt} totalSets={totalSets} totalVolume={totalVolume} prs={0} sessionLog={session.sessionLog} exercises={day.exercises} router={router} />;
+  return <SummaryView dayId={dayId} dayName={day.name} durationMs={Date.now() - session.startedAt} totalSets={totalSets} totalVolume={totalVolume} prs={0} sessionLog={session.sessionLog} exercises={day.exercises} router={router} healthSaved={healthSaved} />;
 }
 
-function SummaryView({ dayId, dayName, durationMs, totalSets, totalVolume, prs, sessionLog, exercises, router }: {
+function SummaryView({ dayId, dayName, durationMs, totalSets, totalVolume, prs, sessionLog, exercises, router, healthSaved }: {
   dayId: string; dayName: string; durationMs: number; totalSets: number; totalVolume: number; prs: number;
   sessionLog: SessionLog; exercises: { name: string; weight: number; unit?: string }[]; router: ReturnType<typeof useRouter>;
+  healthSaved: boolean;
 }) {
   const debrief = coachDebrief(dayName, sessionLog, exercises);
-  const isNative = Capacitor.isNativePlatform();
 
   const s = {
     screen: { paddingTop: 'var(--top)', paddingLeft: 16, paddingRight: 16, paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 32px)', maxWidth: 480, margin: '0 auto', minHeight: '100svh', background: '#000' },
@@ -130,7 +132,7 @@ function SummaryView({ dayId, dayName, durationMs, totalSets, totalVolume, prs, 
         </div>
       </div>
 
-      {isNative && (
+      {healthSaved && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(255,59,48,0.07)', border: '1px solid rgba(255,59,48,0.18)', borderRadius: 12, marginBottom: 14 }}>
           <span style={{ fontSize: 18 }}>❤️</span>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>Workout saved to <strong style={{ color: '#fff' }}>Apple Health</strong></div>

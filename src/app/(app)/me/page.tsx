@@ -23,8 +23,12 @@ export default function MePage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [healthAuthorized, setHealthAuthorized] = useState(false);
   const isNative = Capacitor.isNativePlatform();
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    setHealthAuthorized(localStorage.getItem('healthkit-authorized') === 'true');
+  }, []);
   if (!mounted) return <div style={{ minHeight: '100svh', background: '#000' }} />;
 
   const user = state.user;
@@ -256,17 +260,24 @@ export default function MePage() {
                 </div>
               </div>
             </div>
-            <button
-              onClick={async () => {
-                const btn = document.activeElement as HTMLButtonElement | null;
-                if (btn) btn.textContent = 'Opening Health…';
-                await requestHealthAuthorization();
-                if (btn) btn.textContent = 'Enable Apple Health Access';
-              }}
-              style={{ width: '100%', padding: '11px 0', background: '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
-            >
-              Enable Apple Health Access
-            </button>
+            {healthAuthorized ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 0', background: 'rgba(161,240,194,0.1)', border: '1px solid rgba(161,240,194,0.3)', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#a1f0c2' }}>
+                ✓ Apple Health Connected
+              </div>
+            ) : (
+              <button
+                onClick={async () => {
+                  const granted = await requestHealthAuthorization();
+                  if (granted) {
+                    localStorage.setItem('healthkit-authorized', 'true');
+                    setHealthAuthorized(true);
+                  }
+                }}
+                style={{ width: '100%', padding: '11px 0', background: '#ff3b30', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer' }}
+              >
+                Enable Apple Health Access
+              </button>
+            )}
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 8 }}>
               You can change this anytime in iOS Settings → Workout Coach
             </div>
