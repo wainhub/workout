@@ -28,3 +28,20 @@ echo "▶ npm ci complete."
 echo "▶ Running cap sync ios..."
 npx cap sync ios
 echo "▶ cap sync complete."
+
+# Capacitor 8 registers plugins via packageClassList in capacitor.config.json.
+# cap sync only includes npm-installed Capacitor plugins in that list.
+# Our local HealthKitPlugin is a plain Swift file, so we must inject it manually.
+echo "▶ Injecting HealthKitPlugin into packageClassList..."
+node -e "
+const fs = require('fs');
+const p = process.env.CI_PRIMARY_REPOSITORY_PATH + '/ios/App/App/capacitor.config.json';
+const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+if (!c.packageClassList) c.packageClassList = [];
+if (!c.packageClassList.includes('HealthKitPlugin')) {
+  c.packageClassList.push('HealthKitPlugin');
+  fs.writeFileSync(p, JSON.stringify(c, null, '\t'));
+}
+console.log('packageClassList:', JSON.stringify(c.packageClassList));
+"
+echo "▶ Injection complete."
