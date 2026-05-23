@@ -168,8 +168,8 @@ export default function SignInPage() {
     try {
       const supabase = createClient();
       const { data: { session }, error } = await supabase.auth.signInWithPassword({
-        email: 'demo@workoutcoach.app',
-        password: 'DemoWorkout2024!',
+        email: process.env.NEXT_PUBLIC_DEMO_EMAIL!,
+        password: process.env.NEXT_PUBLIC_DEMO_PASSWORD!,
       });
       if (error || !session) {
         setError(error?.message ?? 'Demo sign-in failed. Try again.');
